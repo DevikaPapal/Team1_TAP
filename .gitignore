@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.pyc
+.Python
+venv/              # Ignore Python virtual environments 
+.ipynb_checkpoints # Jupyter notebooks
+
+# JavaScript/Node
+node_modules/      # Ignore Node.js dependencies 
+build/             # React build output
+.env               # Environment variables (often sensitive)
+
+# IDE-specific files (PyCharm)
+.idea/             # PyCharm project settings
+
+# IDE-specific files (VS Code)
+.vscode/           # VS Code workspace settings
+
+# Operating System files
+.DS_Store          # macOS specific desktop services store
+Thumbs.db          # Windows specific thumbnail cache
+
+# Logs and temporary files
+*.log
+*.tmp
