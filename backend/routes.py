@@ -1,6 +1,9 @@
 from flask import request, jsonify
 from decimal import Decimal
 import yfinance as yf
+from models import db, Portfolio, Holding, Transaction
+from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import func
 
 from models import db, Portfolio, Holding, Transaction
 
@@ -185,7 +188,92 @@ def register_routes(app):
             return jsonify(data)
         except Exception as e:
             return jsonify({"error": str(e)}), 500
+
+    @app.route('/api/portfolio', methods=['GET'])
+    def get_portfolio():
+        """MVP 1 : Get user portfolio"""
+        try:
+            portfolio = Portfolio.query.filter_by(id=1).first() #using the single first portfolio
+
+            holdings = Holding.query.filter_by(portfolio_id=portfolio.id).all()
+
+            portfolio_data = {
+                'id': portfolio.id,
+                'name': portfolio.name,
+                'cash_balance': float(portfolio.cash_balance),
+                'holdings': []
+            }
+
+            total_value = float(portfolio.cash_balance)
+
+            for holding in holdings:
+                current_price = get_quote(holding.ticker)
+                market_value = float(holding.quantity) * current_price
+                total_value += market_value
+                
+                portfolio_data['holdings'].append({
+                    'id': holding.id,
+                    'ticker': holding.ticker,
+                    'quantity': float(holding.quantity),
+                    'cost_basis': float(holding.cost_basis),
+                    'current_price': current_price,
+                    'market_value': market_value,
+                    'unrealized_pnl': market_value - (float(holding.quantity) * float(holding.cost_basis))
+                })
+            
+            portfolio_data['total_value'] = total_value
+            
+            return jsonify(portfolio_data)
         
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+    
+    @app.route('/api/pnl', methods=['GET'])
+    def get_profit_loss():
+        """MVP 3 : Get Profit/loss"""
+        try:
+            portfolio = Portfolio.query.filter_by(id=1).first()
+            if not portfolio:
+                return jsonify({'error': 'Portfolio not found'}), 404
+            holdings = Holding.query.filter_by(portfolio_id=portfolio.id).all()
+            #Calculate Unrealized P&L from current holdings
+            total_unrealized_pnl = 0
+            total_cost_basis = 0
+            total_market_value = 0
+
+            for holding in holdings:
+                current_price = get_quote(holding.ticker)
+                market_value = float(holding.quantity) * current_price
+                cost_basis_value = float(holding.quantity) * float(holding.cost_basis)
+                unrealized_pnl = market_value - cost_basis_value
+                
+                total_market_value += market_value
+                total_cost_basis += cost_basis_value
+                total_unrealized_pnl += unrealized_pnl
+            
+            # Calculate realized P&L from historical transactions
+            realized_pnl_sum = db.session.query(func.sum(Transaction.realized_pnl)).filter(
+                Transaction.portfolio_id == portfolio.id,
+                Transaction.transaction_type == 'sell'
+            ).scalar()
+            
+            # The sum() function returns None if no matching records are found, so handle this
+            total_realized_pnl = float(realized_pnl_sum) if realized_pnl_sum is not None else 0
+
+            #combine and return results
+            pnl_data = {
+                'total_unrealized_pnl': total_unrealized_pnl,
+                'total_realized_pnl': total_realized_pnl,
+                'total_pnl': total_unrealized_pnl + total_realized_pnl,
+                'total_cost_basis': total_cost_basis,
+                'total_market_value': total_market_value,
+                'return_percentage': (total_unrealized_pnl / total_cost_basis * 100) if total_cost_basis > 0 else 0
+            }
+            
+            return jsonify(pnl_data)
+        
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500 
     # ---- FOR TESTING PURPOSES ONLY ----
     # Resetting the database and creating a default portfolio
     @app.route('/setup', methods=['POST'])
