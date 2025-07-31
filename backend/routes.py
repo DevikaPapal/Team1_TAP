@@ -1,0 +1,199 @@
+from flask import request, jsonify
+from decimal import Decimal
+import yfinance as yf
+
+from models import db, Portfolio, Holding, Transaction
+
+def register_routes(app):
+
+    # Route to handle stock trading - both buy/sell, depending on what user inputs as type
+    @app.route('/trade', methods=['POST'])
+    def trade_stock():
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Invalid JSON"}), 400
+
+        portfolio_id = data.get('portfolio_id')
+        ticker = data.get('ticker', '').upper()
+        quantity_str = data.get('quantity')
+        transaction_type = data.get('transaction_type', '').lower()
+
+        if not all([portfolio_id, ticker, quantity_str, transaction_type]):
+            return jsonify({"error": "Missing required fields: portfolio_id, ticker, quantity, transaction_type"}), 400
+
+        # Validate quantity, make sure positive and numeric
+        try:
+            quantity = Decimal(quantity_str)
+            if quantity <= 0:
+                raise ValueError()
+        except (ValueError, TypeError):
+            return jsonify({"error": "Quantity must be a positive number"}), 400
+
+        # Make sure user only puts buy or sell as transaction type
+        if transaction_type not in ['buy', 'sell']:
+            return jsonify({"error": "transaction_type must be 'buy' or 'sell'"}), 400
+
+        # Make sure portfolio exists
+        portfolio = Portfolio.query.get(portfolio_id)
+        if not portfolio:
+            return jsonify({"error": "Portfolio not found"}), 404
+
+        # Fetch stock data using yfinance API and validate ticker
+        stock = yf.Ticker(ticker)
+        stock_info = stock.info
+
+        if not stock_info.get('regularMarketPrice'):
+            return jsonify({"error": f"Invalid ticker symbol: {ticker}"}), 400
+
+        current_price = Decimal(stock_info['regularMarketPrice'])
+
+        if transaction_type == 'buy':
+            return handle_buy(portfolio, ticker, quantity, current_price)
+        else:
+            return handle_sell(portfolio, ticker, quantity, current_price)
+
+    # Function to handle buy transactions
+    def handle_buy(portfolio, ticker, quantity, price):
+        total_cost = quantity * price
+        if portfolio.cash_balance < total_cost:
+            return jsonify({"error": "Insufficient cash balance to complete the purchase"}), 400
+
+        try:
+            portfolio.cash_balance -= total_cost
+
+            new_transaction = Transaction(
+                portfolio_id=portfolio.id,
+                ticker=ticker,
+                transaction_type='buy',
+                price=price,
+                quantity=quantity
+            )
+            db.session.add(new_transaction)
+
+            holding = Holding.query.filter_by(portfolio_id=portfolio.id, ticker=ticker).first()
+            if holding:
+                old_total_value = holding.quantity * holding.cost_basis
+                new_total_value = old_total_value + total_cost
+                new_total_quantity = holding.quantity + quantity
+                holding.quantity = new_total_quantity
+                holding.cost_basis = new_total_value / new_total_quantity
+            else:
+                new_holding = Holding(
+                    portfolio_id=portfolio.id,
+                    ticker=ticker,
+                    quantity=quantity,
+                    cost_basis=price
+                )
+                db.session.add(new_holding)
+
+            db.session.commit()
+            return jsonify({
+                "message": "Buy transaction successful",
+                "ticker": ticker,
+                "quantity": str(quantity),
+                "price": str(price),
+                "new_cash_balance": str(portfolio.cash_balance)
+            }), 200
+
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({"error": "An error occurred during the transaction.", "details": str(e)}), 500
+
+
+    # Function to handle sell transactions
+    def handle_sell(portfolio, ticker, quantity, price):
+        holding = Holding.query.filter_by(portfolio_id=portfolio.id, ticker=ticker).first()
+
+        if not holding:
+            return jsonify({"error": f"You do not own any shares of {ticker}"}), 400
+
+        if quantity > holding.quantity:
+            return jsonify({"error": f"Sell quantity ({quantity}) exceeds holdings ({holding.quantity})"}), 400
+
+        try:
+            total_sale_value = quantity * price
+            portfolio.cash_balance += total_sale_value
+
+            new_transaction = Transaction(
+                portfolio_id=portfolio.id,
+                ticker=ticker,
+                transaction_type='sell',
+                price=price,
+                quantity=quantity
+            )
+            db.session.add(new_transaction)
+
+            holding.quantity -= quantity
+            if holding.quantity == 0:
+                db.session.delete(holding)
+
+            db.session.commit()
+            return jsonify({
+                "message": "Sell transaction successful",
+                "ticker": ticker,
+                "quantity": str(quantity),
+                "price": str(price),
+                "new_cash_balance": str(portfolio.cash_balance)
+            }), 200
+
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({"error": "An error occurred during the transaction.", "details": str(e)}), 500
+    
+    # Get all transactions for a specific portfolio
+    @app.route('/transactions/<int:portfolio_id>', methods=['GET'])
+    def get_transactions(portfolio_id):
+        """Returns a list of all transactions for a specific portfolio."""
+        portfolio = Portfolio.query.get(portfolio_id)
+        if not portfolio:
+            return jsonify({"error": "Portfolio not found"}), 404
+            
+        transactions = Transaction.query.filter_by(portfolio_id=portfolio_id).all()
+        
+        transactions_data = [{
+            "id": t.id,
+            "ticker": t.ticker,
+            "transaction_type": t.transaction_type,
+            "price": str(t.price),
+            "quantity": str(t.quantity),
+            "transaction_date": t.transaction_date.isoformat()
+        } for t in transactions]
+
+        return jsonify(transactions_data), 200
+    
+    # Function to fetch stock data using yfinance
+    @app.route('/quote/<ticker>')
+    def get_quote(ticker):
+        try:
+            stock = yf.Ticker(ticker)
+            info = stock.info
+
+            # Check if yfinance returned valid data
+            if not info or info.get('regularMarketPrice') is None:
+                return jsonify({"error": "Invalid ticker or no data found"}), 404
+
+            data = {
+                "name": info.get('longName', 'N/A'),
+                "ticker": ticker.upper(),
+                "price": info.get('regularMarketPrice', 0),
+                "change": round(info.get('regularMarketPrice', 0) - info.get('previousClose', 0), 2),
+                "percent_change": round(((info.get('regularMarketPrice', 0) - info.get('previousClose', 0)) / info.get('previousClose', 0)) * 100, 2),
+                "day_high": info.get('regularMarketDayHigh', 0),
+                "day_low": info.get('regularMarketDayLow', 0),
+                "market_cap": info.get('marketCap', 0)
+            }
+            return jsonify(data)
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+        
+    # ---- FOR TESTING PURPOSES ONLY ----
+    # Resetting the database and creating a default portfolio
+    @app.route('/setup', methods=['POST'])
+    def setup_portfolio():
+        with app.app_context():
+            db.drop_all()
+            db.create_all()
+            portfolio = Portfolio(name="Default Portfolio", cash_balance=Decimal('100000.00'))
+            db.session.add(portfolio)
+            db.session.commit()
+            return jsonify({"message": "Database reset and default portfolio created.", "portfolio_id": portfolio.id}), 201

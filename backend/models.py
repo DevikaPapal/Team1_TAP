@@ -40,7 +40,8 @@ class Transaction(db.Model):
     __tablename__ = 'transactions'
 
     id = db.Column(db.Integer, primary_key=True)
-    transaction_type = db.Column(db.String(255))  # 'buy'/'sell' or +/-? 
+    transaction_type = db.Column(db.String(255))
+    ticker = db.Column(db.String(10), nullable=False)
     price = db.Column(db.Numeric(10, 4))
     quantity = db.Column(db.Integer)
     transaction_date = db.Column(db.DateTime(timezone=True), default=datetime.utcnow)
