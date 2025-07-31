@@ -1,0 +1,33 @@
+.app {
+  text-align: center;
+  font-family: Arial, sans-serif;
+  padding: 20px;
+}
+
+.title {
+  font-size: 32px;
+  margin-bottom: 20px;
+}
+
+.navbar {
+  margin-bottom: 30px;
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+}
+
+.navbar a {
+  text-decoration: none;
+  padding: 10px 20px;
+  background-color: #007bff;
+  color: white;
+  border-radius: 5px;
+}
+
+.navbar a:hover {
+  background-color: #0056b3;
+}
+
+.page {
+  margin-top: 40px;
+}
