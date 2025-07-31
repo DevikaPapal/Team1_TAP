@@ -1,9 +1,10 @@
 from flask import request, jsonify
+from models import db, Portfolio, Holding, Transaction
 from decimal import Decimal
 import yfinance as yf
-from models import db, Portfolio, Holding, Transaction
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import func
+from sqlalchemy import CheckConstraint, func
+
 
 from models import db, Portfolio, Holding, Transaction
 
@@ -188,8 +189,8 @@ def register_routes(app):
             return jsonify(data)
         except Exception as e:
             return jsonify({"error": str(e)}), 500
-
-    @app.route('/api/portfolio', methods=['GET'])
+        
+    @app.route('/portfolio', methods=['GET'])
     def get_portfolio():
         """MVP 1 : Get user portfolio"""
         try:
@@ -227,8 +228,8 @@ def register_routes(app):
         
         except Exception as e:
             return jsonify({'error': str(e)}), 500
-    
-    @app.route('/api/pnl', methods=['GET'])
+        
+    @app.route('/pnl', methods=['GET'])
     def get_profit_loss():
         """MVP 3 : Get Profit/loss"""
         try:
@@ -273,7 +274,8 @@ def register_routes(app):
             return jsonify(pnl_data)
         
         except Exception as e:
-            return jsonify({'error': str(e)}), 500 
+            return jsonify({'error': str(e)}), 500
+            
     # ---- FOR TESTING PURPOSES ONLY ----
     # Resetting the database and creating a default portfolio
     @app.route('/setup', methods=['POST'])
