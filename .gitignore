@@ -23,3 +23,6 @@ Thumbs.db          # Windows specific thumbnail cache
 # Logs and temporary files
 *.log
 *.tmp
+
+# Virtual environments
+venv/
