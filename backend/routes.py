@@ -1,7 +1,7 @@
 from flask import request, jsonify
 from models import db, Portfolio, Holding, Transaction
 from decimal import Decimal
-import yfinance as yf
+import yfinance_cache as yfc
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import CheckConstraint, func
 
@@ -43,7 +43,7 @@ def register_routes(app):
             return jsonify({"error": "Portfolio not found"}), 404
 
         # Fetch stock data using yfinance API and validate ticker
-        stock = yf.Ticker(ticker)
+        stock = yfc.Ticker(ticker)
         stock_info = stock.info
 
         if not stock_info.get('regularMarketPrice'):
@@ -165,11 +165,21 @@ def register_routes(app):
 
         return jsonify(transactions_data), 200
     
+    # Utility function to get just the current price of a stock
+    def get_current_price(ticker):
+        try:
+            stock = yfc.Ticker(ticker)
+            info = stock.info
+            return info.get('regularMarketPrice')
+        except Exception as e:
+            print(f"Error fetching current price for {ticker}: {str(e)}")
+            return 0
+
     # Function to fetch stock data using yfinance
     @app.route('/quote/<ticker>')
     def get_quote(ticker):
         try:
-            stock = yf.Ticker(ticker)
+            stock = yfc.Ticker(ticker)
             info = stock.info
 
             # Check if yfinance returned valid data
@@ -208,7 +218,7 @@ def register_routes(app):
             total_value = float(portfolio.cash_balance)
 
             for holding in holdings:
-                current_price = get_quote(holding.ticker)
+                current_price = get_current_price(holding.ticker)
                 market_value = float(holding.quantity) * current_price
                 total_value += market_value
                 
@@ -243,7 +253,7 @@ def register_routes(app):
             total_market_value = 0
 
             for holding in holdings:
-                current_price = get_quote(holding.ticker)
+                current_price = get_current_price(holding.ticker)
                 market_value = float(holding.quantity) * current_price
                 cost_basis_value = float(holding.quantity) * float(holding.cost_basis)
                 unrealized_pnl = market_value - cost_basis_value
@@ -285,5 +295,13 @@ def register_routes(app):
             db.create_all()
             portfolio = Portfolio(name="Default Portfolio", cash_balance=Decimal('100000.00'))
             db.session.add(portfolio)
+            db.session.commit()
+
+            holding = Holding(portfolio_id=portfolio.id, ticker='AAPL', quantity=Decimal('10'), cost_basis=Decimal('150.00'))
+            holding2 = Holding(portfolio_id=portfolio.id, ticker='GOOGL', quantity=Decimal('5'), cost_basis=Decimal('280.00'))
+            transaction = Transaction(portfolio_id=portfolio.id, ticker='AAPL', transaction_type='buy', price=Decimal('150.00'), quantity=Decimal('10'))
+            db.session.add(holding)
+            db.session.add(holding2)
+            db.session.add(transaction)
             db.session.commit()
             return jsonify({"message": "Database reset and default portfolio created.", "portfolio_id": portfolio.id}), 201

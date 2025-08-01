@@ -25,6 +25,26 @@ function Home() {
     }
   };
 
+  const setupPortfolio = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch("http://localhost:5001/setup", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      if (!response.ok) {
+        throw new Error("Failed to setup portfolio");
+      }
+      // After setup, fetch the portfolio data
+      await fetchPortfolio();
+    } catch (err) {
+      setError(err.message);
+      setLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div style={{ padding: "20px", textAlign: "center" }}>
@@ -59,6 +79,20 @@ function Home() {
         <p>Cash Balance: ${portfolio.cash_balance.toLocaleString()}</p>
         <p>Total Portfolio Value: ${portfolio.total_value.toLocaleString()}</p>
         <p>Holdings: {portfolio.holdings.length}</p>
+        <button 
+          onClick={setupPortfolio}
+          style={{
+            marginTop: "10px",
+            padding: "10px 20px",
+            backgroundColor: "#007bff",
+            color: "white",
+            border: "none",
+            borderRadius: "5px",
+            cursor: "pointer"
+          }}
+        >
+          Reset & Setup Default Portfolio
+        </button>
       </div>
 
       {/* Holdings Table */}
