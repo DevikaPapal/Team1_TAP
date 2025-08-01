@@ -9,8 +9,8 @@ def create_app():
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
     # Enable CORS for all routes
-    CORS(app)
-    
+    CORS(app)  #added CORS
+
     db.init_app(app)
     register_routes(app)
 

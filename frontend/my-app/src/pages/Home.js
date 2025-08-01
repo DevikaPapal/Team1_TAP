@@ -8,7 +8,7 @@ function Home() {
   useEffect(() => {
     fetchPortfolio();
   }, []);
-
+  /*trying to push*/
   const fetchPortfolio = async () => {
     try {
       setLoading(true);
