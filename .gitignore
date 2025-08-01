@@ -7,8 +7,14 @@ venv/              # Ignore Python virtual environments
 
 # JavaScript/Node
 node_modules/      # Ignore Node.js dependencies 
+/.pnp
+.pnp.js
+/coverage
 build/             # React build output
 .env               # Environment variables (often sensitive)
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
 # IDE-specific files (PyCharm)
 .idea/             # PyCharm project settings
@@ -23,3 +29,4 @@ Thumbs.db          # Windows specific thumbnail cache
 # Logs and temporary files
 *.log
 *.tmp
+/venv/             # Python virtual environment

@@ -40,10 +40,14 @@ class Transaction(db.Model):
     __tablename__ = 'transactions'
 
     id = db.Column(db.Integer, primary_key=True)
-    transaction_type = db.Column(db.String(255))  # 'buy'/'sell' or +/-? 
+    transaction_type = db.Column(db.String(255))
+    ticker = db.Column(db.String(10), nullable=False)
     price = db.Column(db.Numeric(10, 4))
-    quantity = db.Column(db.Integer)
+    quantity = db.Column(db.Numeric(18,8))
+    realized_pnl = db.Column(db.Numeric(10,4), default=0) #makes it a definitive record of the profit/loss from that specific trade
     transaction_date = db.Column(db.DateTime(timezone=True), default=datetime.utcnow)
+    #foreign key to link a transaction to specifc holding 
+    holding_id = db.Column(db.Integer, db.ForeignKey('holdings.id'), nullable=True)
 
     # Foreign key to link transaction to a portfolio
     portfolio_id = db.Column(db.Integer, db.ForeignKey('portfolios.id'), nullable=False)
