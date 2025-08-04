@@ -1,14 +1,22 @@
-from flask import request, jsonify
-from models import db, Portfolio, Holding, Transaction
+from flask import request, jsonify, Blueprint
+from models import db, Portfolio, Holding, Transaction, PortfolioValue
 from decimal import Decimal
 import yfinance_cache as yfc
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import CheckConstraint, func
+from datetime import date, timedelta
 
 
-from models import db, Portfolio, Holding, Transaction
+bp = Blueprint('portfolio', __name__)
+
+@bp.route('/api/portfolio/daily-values')
+def daily_values():
+    values = PortfolioValue.query.order_by(PortfolioValue.date).all()
+    data = [{"date": v.date.strftime("%Y-%m-%d"), "value": v.value} for v in values]
+    return jsonify(data)
 
 def register_routes(app):
+    app.register_blueprint(bp)
 
     # Route to handle stock trading - both buy/sell, depending on what user inputs as type
     @app.route('/trade', methods=['POST'])
@@ -304,4 +312,15 @@ def register_routes(app):
             db.session.add(holding2)
             db.session.add(transaction)
             db.session.commit()
+
+            today = date.today()
+            for i in range(7):
+                pv = PortfolioValue(
+                    date=today - timedelta(days=i),
+                    value=100000 + i * 500,
+                    portfolio_id=portfolio.id  # <-- Add this line!
+                )
+                db.session.add(pv)
+            db.session.commit()
+            
             return jsonify({"message": "Database reset and default portfolio created.", "portfolio_id": portfolio.id}), 201

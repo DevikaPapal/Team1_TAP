@@ -51,3 +51,19 @@ class Transaction(db.Model):
 
     # Foreign key to link transaction to a portfolio
     portfolio_id = db.Column(db.Integer, db.ForeignKey('portfolios.id'), nullable=False)
+
+# PortfolioValue model to represent the value of a portfolio at a specific date
+class PortfolioValue(db.Model):
+    __tablename__ = 'portfolio_values'
+
+    id = db.Column(db.Integer, primary_key=True)
+    date = db.Column(db.Date, nullable=False)
+    value = db.Column(db.Float, nullable=False)
+
+    # Foreign key to link portfolio value to a portfolio
+    portfolio_id = db.Column(db.Integer, db.ForeignKey('portfolios.id'), nullable=False)
+
+    # Ensure that the combination of portfolio_id and date is unique
+    __table_args__ = (
+        db.UniqueConstraint('portfolio_id', 'date', name='uq_portfolio_date'),
+    )
