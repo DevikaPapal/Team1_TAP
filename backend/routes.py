@@ -165,6 +165,111 @@ def register_routes(app):
 
         return jsonify(transactions_data), 200
     
+    @app.route('/portfolio/history', methods=['GET'])
+    def get_portfolio_history():
+        """Get portfolio value history based on transaction dates"""
+        print("Portfolio history endpoint called")  # Debug print
+        try:
+            portfolio = Portfolio.query.filter_by(id=1).first()
+            if not portfolio:
+                print("Portfolio not found")  # Debug print
+                return jsonify({'error': 'Portfolio not found'}), 404
+
+            # Get all transactions ordered by date
+            transactions = Transaction.query.filter_by(portfolio_id=portfolio.id).order_by(Transaction.transaction_date.asc()).all()
+            
+            if not transactions:
+                print("No transactions found")  # Debug print
+                return jsonify({'error': 'No transactions found'}), 404
+
+            # Calculate portfolio value at each transaction date
+            history_data = []
+            initial_cash = 100000  # Starting cash balance
+            current_cash = initial_cash
+            holdings = {}  # Track holdings at each point
+            
+            for transaction in transactions:
+                date = transaction.transaction_date.strftime('%Y-%m-%d')
+                ticker = transaction.ticker
+                quantity = float(transaction.quantity)
+                price = float(transaction.price)
+                
+                if transaction.transaction_type == 'buy':
+                    # Update cash and holdings
+                    total_cost = quantity * price
+                    current_cash -= total_cost
+                    
+                    if ticker in holdings:
+                        # Update existing holding
+                        old_quantity = holdings[ticker]['quantity']
+                        old_cost = holdings[ticker]['cost_basis']
+                        new_quantity = old_quantity + quantity
+                        new_cost_basis = ((old_quantity * old_cost) + total_cost) / new_quantity
+                        holdings[ticker] = {
+                            'quantity': new_quantity,
+                            'cost_basis': new_cost_basis
+                        }
+                    else:
+                        # New holding
+                        holdings[ticker] = {
+                            'quantity': quantity,
+                            'cost_basis': price
+                        }
+                else:  # sell
+                    # Update cash and holdings
+                    total_proceeds = quantity * price
+                    current_cash += total_proceeds
+                    
+                    if ticker in holdings:
+                        holdings[ticker]['quantity'] -= quantity
+                        if holdings[ticker]['quantity'] <= 0:
+                            del holdings[ticker]
+                
+                # Calculate current portfolio value
+                holdings_value = sum(
+                    holding['quantity'] * get_current_price(ticker) 
+                    for ticker, holding in holdings.items()
+                )
+                portfolio_value = current_cash + holdings_value
+                
+                history_data.append({
+                    'date': date,
+                    'portfolio_value': portfolio_value,
+                    'cash_balance': current_cash,
+                    'holdings_value': holdings_value,
+                    'transaction_type': transaction.transaction_type,
+                    'ticker': ticker,
+                    'quantity': quantity,
+                    'price': price
+                })
+            
+            # Add current state
+            current_holdings = Holding.query.filter_by(portfolio_id=portfolio.id).all()
+            current_holdings_value = sum(
+                float(holding.quantity) * get_current_price(holding.ticker)
+                for holding in current_holdings
+            )
+            current_portfolio_value = float(portfolio.cash_balance) + current_holdings_value
+            
+            history_data.append({
+                'date': 'Current',
+                'portfolio_value': current_portfolio_value,
+                'cash_balance': float(portfolio.cash_balance),
+                'holdings_value': current_holdings_value,
+                'transaction_type': 'current',
+                'ticker': None,
+                'quantity': None,
+                'price': None
+            })
+            
+            return jsonify({
+                'history': history_data,
+                'total_transactions': len(transactions)
+            })
+            
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+    
     # Utility function to get just the current price of a stock
     def get_current_price(ticker):
         try:
