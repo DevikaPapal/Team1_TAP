@@ -95,7 +95,7 @@ def register_routes(app):
                 "message": "Buy transaction successful",
                 "ticker": ticker,
                 "quantity": str(quantity),
-                "price": str(price),
+                "price": str(round(price,2)),
                 "new_cash_balance": str(portfolio.cash_balance)
             }), 200
 
@@ -136,7 +136,7 @@ def register_routes(app):
                 "message": "Sell transaction successful",
                 "ticker": ticker,
                 "quantity": str(quantity),
-                "price": str(price),
+                "price": str(round(price, 2)),
                 "new_cash_balance": str(portfolio.cash_balance)
             }), 200
 
