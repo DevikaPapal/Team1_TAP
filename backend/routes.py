@@ -118,12 +118,17 @@ def register_routes(app):
             total_sale_value = quantity * price
             portfolio.cash_balance += total_sale_value
 
+            # Calculate realized P&L
+            cost_basis_value = quantity * holding.cost_basis
+            realized_pnl = total_sale_value - cost_basis_value
+
             new_transaction = Transaction(
                 portfolio_id=portfolio.id,
                 ticker=ticker,
                 transaction_type='sell',
                 price=price,
-                quantity=quantity
+                quantity=quantity,
+                realized_pnl=realized_pnl
             )
             db.session.add(new_transaction)
 
@@ -137,6 +142,7 @@ def register_routes(app):
                 "ticker": ticker,
                 "quantity": str(quantity),
                 "price": str(round(price, 2)),
+                "realized_pnl": str(round(realized_pnl, 2)),
                 "new_cash_balance": str(portfolio.cash_balance)
             }), 200
 
@@ -160,6 +166,7 @@ def register_routes(app):
             "transaction_type": t.transaction_type,
             "price": str(t.price),
             "quantity": str(t.quantity),
+            "realized_pnl": str(t.realized_pnl) if t.realized_pnl else "0.0000",
             "transaction_date": t.transaction_date.isoformat()
         } for t in transactions]
 
