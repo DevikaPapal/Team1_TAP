@@ -96,7 +96,7 @@ def register_routes(app):
                 "ticker": ticker,
                 "quantity": str(quantity),
                 "price": str(round(price,2)),
-                "new_cash_balance": str(portfolio.cash_balance)
+                "new_cash_balance": str(round(portfolio.cash_balance, 2))
             }), 200
 
         except Exception as e:
@@ -137,7 +137,7 @@ def register_routes(app):
                 "ticker": ticker,
                 "quantity": str(quantity),
                 "price": str(round(price, 2)),
-                "new_cash_balance": str(portfolio.cash_balance)
+                "new_cash_balance": str(round(portfolio.cash_balance, 2))
             }), 200
 
         except Exception as e:
@@ -179,27 +179,53 @@ def register_routes(app):
     @app.route('/quote/<ticker>')
     def get_quote(ticker):
         try:
+            # Validate ticker format (basic check)
+            if not ticker or len(ticker.strip()) == 0:
+                return jsonify({"error": "Please enter a valid ticker symbol"}), 400
+            
+            ticker = ticker.upper().strip()
             stock = yfc.Ticker(ticker)
             info = stock.info
 
             # Check if yfinance returned valid data
-            if not info or info.get('regularMarketPrice') is None:
-                return jsonify({"error": "Invalid ticker or no data found"}), 404
+            if not info or not info.get('regularMarketPrice'):
+                return jsonify({"error": f"Invalid ticker symbol: {ticker}. Please check the symbol and try again."}), 404
+
+            # Additional validation - check if we have minimal required data
+            if not info.get('longName') and not info.get('shortName'):
+                return jsonify({"error": f"Invalid ticker symbol: {ticker}. No company information found."}), 404
+
+            # Safe division for percent change
+            previous_close = info.get('previousClose', 0)
+            regular_market_price = info.get('regularMarketPrice', 0)
+            
+            if previous_close > 0:
+                percent_change = round(((regular_market_price - previous_close) / previous_close) * 100, 2)
+            else:
+                percent_change = 0
 
             data = {
-                "name": info.get('longName', 'N/A'),
-                "ticker": ticker.upper(),
-                "price": info.get('regularMarketPrice', 0),
-                "change": round(info.get('regularMarketPrice', 0) - info.get('previousClose', 0), 2),
-                "percent_change": round(((info.get('regularMarketPrice', 0) - info.get('previousClose', 0)) / info.get('previousClose', 0)) * 100, 2),
-                "day_high": info.get('regularMarketDayHigh', 0),
-                "day_low": info.get('regularMarketDayLow', 0),
-                "market_cap": info.get('marketCap', 0)
+                "name": info.get('longName', info.get('shortName', 'N/A')),
+                "ticker": ticker,
+                "price": round(regular_market_price, 2),
+                "change": round(regular_market_price - previous_close, 2),
+                "percent_change": percent_change,
+                "day_high": round(info.get('regularMarketDayHigh', 0), 2),
+                "day_low": round(info.get('regularMarketDayLow', 0), 2),
+                "market_cap": info.get('marketCap', 0),
+                "week_52_high": round(info.get('fiftyTwoWeekHigh', 0), 2),
+                "week_52_low": round(info.get('fiftyTwoWeekLow', 0), 2),
+                "volume": info.get('regularMarketVolume', 0),
+                "pe_ratio": round(info.get('trailingPE', 0), 2) if info.get('trailingPE') else None,
+                "dividend_yield": info.get('dividendYield') if info.get('dividendYield') else None,
+                "beta": round(info.get('beta', 0), 2) if info.get('beta') else None,
+                "sector": info.get('sector', 'N/A'),
+                "industry": info.get('industry', 'N/A')
             }
-            return jsonify(data)
+            return jsonify(data)        
         except Exception as e:
-            return jsonify({"error": str(e)}), 500
-        
+            return jsonify({"error": f"Invalid ticker symbol: {ticker}. Please verify the symbol and try again."}), 404
+
     @app.route('/portfolio', methods=['GET'])
     def get_portfolio():
         """MVP 1 : Get user portfolio"""
@@ -211,7 +237,7 @@ def register_routes(app):
             portfolio_data = {
                 'id': portfolio.id,
                 'name': portfolio.name,
-                'cash_balance': float(portfolio.cash_balance),
+                'cash_balance': round(float(portfolio.cash_balance), 2),
                 'holdings': []
             }
 
@@ -231,8 +257,8 @@ def register_routes(app):
                     'market_value': market_value,
                     'unrealized_pnl': market_value - (float(holding.quantity) * float(holding.cost_basis))
                 })
-            
-            portfolio_data['total_value'] = total_value
+
+            portfolio_data['total_value'] = round(total_value, 2)
             
             return jsonify(portfolio_data)
         
