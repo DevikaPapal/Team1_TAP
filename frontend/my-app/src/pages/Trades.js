@@ -328,7 +328,7 @@ function Trades() {
       <div className="portfolio-header">
         <h2>Trading Dashboard</h2>
         <p className="cash-balance">
-          Cash Balance: ${portfolio?.cash_balance?.toLocaleString() || '0.00'}
+          Cash Balance: ${portfolio?.cash_balance?.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) || '0.00'}
         </p>
       </div>
 
@@ -593,7 +593,13 @@ function Trades() {
                   {transactions.map((transaction, index) => (
                     <tr key={transaction.id} className={index % 2 === 0 ? "table-row-even" : "table-row-odd"}>
                       <td className="table-cell table-cell-left">
-                        {new Date(transaction.transaction_date).toLocaleDateString()}
+                        {(() => {
+                          const date = new Date(transaction.transaction_date);
+                          const dateStr = date.toLocaleDateString();
+                          const timeStr = date.toLocaleTimeString();
+                          const timezone = date.toLocaleTimeString('en-US', { timeZoneName: 'short' }).split(' ')[2];
+                          return `${dateStr}, ${timeStr.split(' ')[0]} ${timeStr.split(' ')[1]} ${timezone}`;
+                        })()}
                       </td>
                       <td className="table-cell table-cell-left">
                         {transaction.ticker}
