@@ -103,7 +103,8 @@ function ProfitLoss() {
       if (item.date === "Current") {
         return "Current";
       }
-      const date = new Date(item.date);
+      const [year, month, day] = item.date.split("-");
+      const date = new Date(year, month - 1, day);
       return date.toLocaleDateString("en-US", {
         month: "short",
         day: "numeric",
@@ -143,6 +144,15 @@ function ProfitLoss() {
               context.dataset.label + ": " + formatCurrency(context.parsed.y)
             );
           },
+          afterLabel: function (context) {
+            const dataPoint = historyData?.history?.[context.dataIndex];
+            if (dataPoint && dataPoint.transaction_type !== "current") {
+              return `${dataPoint.ticker} ${dataPoint.transaction_type} ${
+                dataPoint.quantity
+              } @ ${formatCurrency(dataPoint.price)}`;
+            }
+            return "";
+          },
         },
       },
     },
@@ -172,10 +182,7 @@ function ProfitLoss() {
         },
       },
       x: {
-        title: {
-          display: true,
-          text: "Transaction Date",
-        },
+        display: false,
       },
     },
     interaction: {

@@ -4,6 +4,8 @@ from decimal import Decimal
 import yfinance_cache as yfc
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import CheckConstraint, func
+from datetime import datetime, timezone
+import pytz
 
 
 from models import db, Portfolio, Holding, Transaction
@@ -194,9 +196,9 @@ def register_routes(app):
             initial_cash = 100000  # Starting cash balance
             current_cash = initial_cash
             holdings = {}  # Track holdings at each point
-            
+            local_tz = pytz.timezone('America/New_York')
             for transaction in transactions:
-                date = transaction.transaction_date.strftime('%Y-%m-%d')
+                date = transaction.transaction_date.astimezone(local_tz).strftime('%Y-%m-%d')
                 ticker = transaction.ticker
                 quantity = float(transaction.quantity)
                 price = float(transaction.price)
@@ -232,9 +234,9 @@ def register_routes(app):
                         if holdings[ticker]['quantity'] <= 0:
                             del holdings[ticker]
                 
-                # Calculate current portfolio value
+                # Calculate current portfolio value using transaction prices 
                 holdings_value = sum(
-                    holding['quantity'] * get_current_price(ticker) 
+                    holding['quantity'] * holding['cost_basis'] 
                     for ticker, holding in holdings.items()
                 )
                 portfolio_value = current_cash + holdings_value
