@@ -45,7 +45,7 @@ class Transaction(db.Model):
     price = db.Column(db.Numeric(10, 4))
     quantity = db.Column(db.Numeric(18,8))
     realized_pnl = db.Column(db.Numeric(10,4), default=0) #makes it a definitive record of the profit/loss from that specific trade
-    transaction_date = db.Column(db.DateTime(timezone=True), default=datetime.utcnow)
+    transaction_date = db.Column(db.DateTime(timezone=True), default=datetime.now())
     #foreign key to link a transaction to specifc holding 
     holding_id = db.Column(db.Integer, db.ForeignKey('holdings.id'), nullable=True)
 

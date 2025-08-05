@@ -72,7 +72,8 @@ def register_routes(app):
                 ticker=ticker,
                 transaction_type='buy',
                 price=price,
-                quantity=quantity
+                quantity=quantity,
+                transaction_date=datetime.now()
             )
             db.session.add(new_transaction)
 
@@ -130,7 +131,8 @@ def register_routes(app):
                 transaction_type='sell',
                 price=price,
                 quantity=quantity,
-                realized_pnl=realized_pnl
+                realized_pnl=realized_pnl,
+                transaction_date=datetime.now()
             )
             db.session.add(new_transaction)
 
