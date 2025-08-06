@@ -34,6 +34,103 @@ function Trades() {
     fetchPortfolio();
   }, []);
 
+  // Auto-refresh prices every 3 seconds
+  useEffect(() => {
+    const refreshInterval = setInterval(() => {
+      // Only refresh search result price if there's an active search
+      if (searchResult && searchResult.ticker) {
+        refreshSearchQuote(searchResult.ticker);
+      }
+      
+      // Only refresh trade quote price if there's an active trade ticker
+      if (tradeQuote && tradeTicker) {
+        refreshTradeQuote(tradeTicker);
+      }
+
+      // Refresh portfolio holdings prices without full reload
+      if (portfolio && portfolio.holdings && portfolio.holdings.length > 0) {
+        refreshPortfolioHoldingsPrices();
+      }
+    }, 1000);
+
+    // Cleanup interval on component unmount
+    return () => clearInterval(refreshInterval);
+  }, [searchResult, tradeQuote, tradeTicker, portfolio]);
+
+  // Function to refresh only the current prices of portfolio holdings
+  const refreshPortfolioHoldingsPrices = async () => {
+    if (!portfolio || !portfolio.holdings) return;
+
+    try {
+      const updatedHoldings = await Promise.all(
+        portfolio.holdings.map(async (holding) => {
+          try {
+            const response = await fetch(`http://localhost:5001/quote/${holding.ticker}`);
+            if (response.ok) {
+              const quoteData = await response.json();
+              const newCurrentPrice = quoteData.price;
+              const newMarketValue = holding.quantity * newCurrentPrice;
+              const newUnrealizedPnl = newMarketValue - (holding.quantity * holding.cost_basis);
+              
+              return {
+                ...holding,
+                current_price: newCurrentPrice,
+                market_value: newMarketValue,
+                unrealized_pnl: newUnrealizedPnl
+              };
+            }
+            return holding; // Return unchanged if API call fails
+          } catch (err) {
+            console.log(`Failed to refresh price for ${holding.ticker}:`, err.message);
+            return holding; // Return unchanged if error
+          }
+        })
+      );
+
+      // Calculate new total value
+      const newCashBalance = portfolio.cash_balance;
+      const newTotalHoldingsValue = updatedHoldings.reduce((sum, holding) => sum + holding.market_value, 0);
+      const newTotalValue = newCashBalance + newTotalHoldingsValue;
+
+      // Update portfolio state with new prices
+      setPortfolio(prev => ({
+        ...prev,
+        holdings: updatedHoldings,
+        total_value: newTotalValue
+      }));
+    } catch (err) {
+      console.log("Failed to refresh portfolio prices:", err.message);
+    }
+  };
+
+  // Function to refresh search quote without changing loading state
+  const refreshSearchQuote = async (ticker) => {
+    try {
+      const response = await fetch(`http://localhost:5001/quote/${ticker}`);
+      if (response.ok) {
+        const data = await response.json();
+        setSearchResult(data);
+      }
+    } catch (err) {
+      // Silently fail to avoid disrupting user experience
+      console.log("Failed to refresh search quote:", err.message);
+    }
+  };
+
+  // Function to refresh trade quote without changing loading state
+  const refreshTradeQuote = async (ticker) => {
+    try {
+      const response = await fetch(`http://localhost:5001/quote/${ticker}`);
+      if (response.ok) {
+        const data = await response.json();
+        setTradeQuote(data);
+      }
+    } catch (err) {
+      // Silently fail to avoid disrupting user experience
+      console.log("Failed to refresh trade quote:", err.message);
+    }
+  };
+
   const fetchPortfolio = async () => {
     try {
       setLoading(true);
@@ -64,8 +161,8 @@ function Trades() {
       const data = await response.json();
       setTransactions(data);
       
-      // Extract unique stock tickers from transactions for previous stocks
-      const uniqueTickers = [...new Set(data.map(transaction => transaction.ticker))];
+      // Keeping track of most recent unique stocks based on transaction history
+      const uniqueTickers = [...new Set(data.reverse().map(transaction => transaction.ticker))];
       setPreviousStocks(uniqueTickers);
     } catch (err) {
       setTransactionsError(err.message);
@@ -199,7 +296,19 @@ function Trades() {
         throw new Error(data.error || "Trade failed");
       }
 
-      setTradeMessage(`${pendingTrade.type.charAt(0).toUpperCase() + pendingTrade.type.slice(1)} order successful: ${pendingTrade.quantity} shares of ${pendingTrade.ticker} at $${data.price}`);
+      // Check if execution price differs from quoted price
+      const executionPrice = parseFloat(data.execution_price);
+      const quotedPrice = pendingTrade.price;
+      const priceDifference = Math.abs(executionPrice - quotedPrice);
+      
+      let priceMessage = `${pendingTrade.type.charAt(0).toUpperCase() + pendingTrade.type.slice(1)} order successful: ${pendingTrade.quantity} shares of ${pendingTrade.ticker} at $${data.execution_price}`;
+      
+      // If there's a significant price difference (more than 1 cent), notify the user
+      if (priceDifference > 0.001) {
+        priceMessage += ` (Updated from quoted price of $${quotedPrice.toFixed(2)})`;
+      }
+      
+      setTradeMessage(priceMessage);
       
       // Refresh portfolio data and transactions
       await fetchPortfolio();
@@ -361,7 +470,7 @@ function Trades() {
                 disabled={searchLoading}
                 className="search-button"
               >
-                {searchLoading ? "Searching..." : "Search"}
+                Search
               </button>
               <button
                 onClick={() => {
@@ -374,19 +483,12 @@ function Trades() {
               >
                 Clear
               </button>
-              {searchResult && (
-                <button
-                  onClick={() => searchSpecificStock(searchResult.ticker)}
-                  disabled={searchLoading}
-                  className="search-button refresh-button"
-                >
-                  {searchLoading ? "Refreshing..." : "Refresh"}
-                </button>
-              )}
             </div>
           </div>
 
+          
           <div className="stocks-sections-container">
+            {previousStocks.length == 0 && (              
             <div className="popular-stocks">
               <p className="popular-stocks-label">Popular stocks:</p>
               <div className="popular-stock-buttons">
@@ -402,6 +504,7 @@ function Trades() {
                 ))}
               </div>
             </div>
+            )}
 
             {previousStocks.length > 0 && (
               <div className="popular-stocks">
@@ -636,8 +739,8 @@ function Trades() {
               <p><strong>Action:</strong> {pendingTrade.type.toUpperCase()}</p>
               <p><strong>Stock:</strong> {pendingTrade.ticker}</p>
               <p><strong>Quantity:</strong> {pendingTrade.quantity} shares</p>
-              <p><strong>Price:</strong> ${pendingTrade.price.toFixed(2)} per share</p>
-              <p><strong>Total:</strong> ${pendingTrade.total.toFixed(2)}</p>
+              <p><strong>Estimated Price:</strong> ${pendingTrade.price.toFixed(2)} per share</p>
+              <p><strong>Estimated Total:</strong> ${pendingTrade.total.toFixed(2)}</p>
             </div>
             <div className="confirmation-buttons">
               <button 
