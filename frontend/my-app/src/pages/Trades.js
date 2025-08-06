@@ -34,7 +34,7 @@ function Trades() {
     fetchPortfolio();
   }, []);
 
-  // Auto-refresh prices every 3 seconds
+  // Auto-refresh prices every second
   useEffect(() => {
     const refreshInterval = setInterval(() => {
       // Only refresh search result price if there's an active search
@@ -238,13 +238,25 @@ function Trades() {
   const handleTradeTickerChange = (e) => {
     const ticker = e.target.value;
     setTradeTicker(ticker);
-    if (ticker.trim()) {
-      fetchTradeQuote(ticker);
-    } else {
+    
+    // Clear previous quote and error when user starts typing
+    if (!ticker.trim()) {
       setTradeQuote(null);
       setTradeError(null);
     }
   };
+
+  // Debounced effect to fetch trade quote after user stops typing
+  useEffect(() => {
+    if (!tradeTicker.trim()) return;
+
+    const timeoutId = setTimeout(() => {
+      fetchTradeQuote(tradeTicker);
+    }, 500); // 500ms delay after user stops typing
+
+    // Cancel the timeout if user keeps typing
+    return () => clearTimeout(timeoutId);
+  }, [tradeTicker]); 
 
   const executeTrade = async (transactionType) => {
     if (!tradeTicker.trim() || !tradeQuantity.trim()) {
@@ -739,8 +751,6 @@ function Trades() {
               <p><strong>Action:</strong> {pendingTrade.type.toUpperCase()}</p>
               <p><strong>Stock:</strong> {pendingTrade.ticker}</p>
               <p><strong>Quantity:</strong> {pendingTrade.quantity} shares</p>
-              <p><strong>Estimated Price:</strong> ${pendingTrade.price.toFixed(2)} per share</p>
-              <p><strong>Estimated Total:</strong> ${pendingTrade.total.toFixed(2)}</p>
             </div>
             <div className="confirmation-buttons">
               <button 
