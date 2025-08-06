@@ -1,7 +1,7 @@
 from flask import request, jsonify
 from models import db, Portfolio, Holding, Transaction
 from decimal import Decimal
-import yfinance_cache as yfc
+import yfinance as yf
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import CheckConstraint, func
 from datetime import datetime, timezone
@@ -44,14 +44,19 @@ def register_routes(app):
         if not portfolio:
             return jsonify({"error": "Portfolio not found"}), 404
 
-        # Fetch stock data using yfinance API and validate ticker
-        stock = yfc.Ticker(ticker)
-        stock_info = stock.info
+        # Fetch stock data using yfinance API at execution time
+        try:
+            stock = yf.Ticker(ticker)
+            stock_info = stock.info
 
-        if not stock_info.get('regularMarketPrice'):
-            return jsonify({"error": f"Invalid ticker symbol: {ticker}"}), 400
+            if not stock_info.get('regularMarketPrice'):
+                return jsonify({"error": f"Invalid ticker symbol: {ticker}"}), 400
 
-        current_price = Decimal(stock_info['regularMarketPrice'])
+            # Use the most current price available at execution
+            current_price = Decimal(stock_info['regularMarketPrice'])
+            
+        except Exception as e:
+            return jsonify({"error": f"Failed to fetch current price for {ticker}: {str(e)}"}), 500
 
         if transaction_type == 'buy':
             return handle_buy(portfolio, ticker, quantity, current_price)
@@ -99,6 +104,8 @@ def register_routes(app):
                 "ticker": ticker,
                 "quantity": str(quantity),
                 "price": str(round(price,2)),
+                "execution_price": str(round(price,2)),  # Make it clear this is the execution price
+                "total_cost": str(round(quantity * price, 2)),
                 "new_cash_balance": str(round(portfolio.cash_balance, 2))
             }), 200
 
@@ -146,6 +153,8 @@ def register_routes(app):
                 "ticker": ticker,
                 "quantity": str(quantity),
                 "price": str(round(price, 2)),
+                "execution_price": str(round(price, 2)),  # Make it clear this is the execution price
+                "total_proceeds": str(round(quantity * price, 2)),
                 "realized_pnl": str(round(realized_pnl, 2)),
                 "new_cash_balance": str(round(portfolio.cash_balance, 2))
             }), 200
@@ -284,7 +293,7 @@ def register_routes(app):
     # Utility function to get just the current price of a stock
     def get_current_price(ticker):
         try:
-            stock = yfc.Ticker(ticker)
+            stock = yf.Ticker(ticker)
             info = stock.info
             return info.get('regularMarketPrice')
         except Exception as e:
@@ -300,7 +309,7 @@ def register_routes(app):
                 return jsonify({"error": "Please enter a valid ticker symbol"}), 400
             
             ticker = ticker.upper().strip()
-            stock = yfc.Ticker(ticker)
+            stock = yf.Ticker(ticker)
             info = stock.info
 
             # Check if yfinance returned valid data
