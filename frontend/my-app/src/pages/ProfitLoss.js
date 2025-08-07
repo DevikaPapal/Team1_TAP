@@ -24,12 +24,33 @@ function ProfitLoss() {
   const [portfolio, setPortfolio] = useState(null);
   const [pnlData, setPnlData] = useState(null);
   const [historyData, setHistoryData] = useState(null);
+  const [dailyHistoryData, setDailyHistoryData] = useState(null);
+  const [selectedDays, setSelectedDays] = useState(30);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     fetchData();
   }, []);
+
+  useEffect(() => {
+    fetchDailyHistory();
+  }, [selectedDays]);
+
+  const fetchDailyHistory = async () => {
+    try {
+      const dailyHistoryResponse = await fetch(
+        `http://localhost:5001/portfolio/daily-history/${selectedDays}`
+      );
+      if (!dailyHistoryResponse.ok) {
+        throw new Error("Failed to fetch daily portfolio history");
+      }
+      const dailyHistoryData = await dailyHistoryResponse.json();
+      setDailyHistoryData(dailyHistoryData);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
 
   const fetchData = async () => {
     try {
@@ -95,6 +116,49 @@ function ProfitLoss() {
     return `${value >= 0 ? "+" : ""}${value.toFixed(2)}%`;
   };
 
+  // Create chart data from daily portfolio history (past 30 days)
+  const generateDailyChartData = () => {
+    if (!dailyHistoryData?.daily_history || dailyHistoryData.daily_history.length === 0) return null;
+
+    const labels = dailyHistoryData.daily_history.map((item) => {
+      const date = new Date(item.date);
+      return date.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+      });
+    });
+
+    const portfolioValues = dailyHistoryData.daily_history.map(
+      (item) => item.portfolio_value
+    );
+
+    const startValue = portfolioValues[0];
+    const endValue = portfolioValues[portfolioValues.length - 1];
+    const totalReturn = endValue - startValue;
+    const totalReturnPercent = ((totalReturn / startValue) * 100).toFixed(2);
+
+    return {
+      labels: labels,
+      datasets: [
+        {
+          label: "Portfolio Value",
+          data: portfolioValues,
+          borderColor: totalReturn >= 0 ? "#22c55e" : "#ef4444",
+          backgroundColor: totalReturn >= 0 ? "rgba(34, 197, 94, 0.1)" : "rgba(239, 68, 68, 0.1)",
+          fill: true,
+          tension: 0.4,
+        },
+      ],
+      metadata: {
+        totalReturn,
+        totalReturnPercent,
+        startValue,
+        endValue,
+        days: dailyHistoryData.daily_history.length
+      }
+    };
+  };
+
   // Create chart data from real transaction history
   const generateChartData = () => {
     if (!historyData?.history || historyData.history.length === 0) return null;
@@ -144,15 +208,6 @@ function ProfitLoss() {
               context.dataset.label + ": " + formatCurrency(context.parsed.y)
             );
           },
-          afterLabel: function (context) {
-            const dataPoint = historyData?.history?.[context.dataIndex];
-            if (dataPoint && dataPoint.transaction_type !== "current") {
-              return `${dataPoint.ticker} ${dataPoint.transaction_type} ${
-                dataPoint.quantity
-              } @ ${formatCurrency(dataPoint.price)}`;
-            }
-            return "";
-          },
         },
       },
     },
@@ -182,7 +237,16 @@ function ProfitLoss() {
         },
       },
       x: {
-        display: false,
+        display: true,
+        title: {
+          display: true,
+          text: "Date",
+        },
+        ticks: {
+          maxTicksLimit: 8, // Limit the number of date labels to prevent crowding
+          maxRotation: 45,
+          minRotation: 45,
+        },
       },
     },
     interaction: {
@@ -210,6 +274,7 @@ function ProfitLoss() {
   }
 
   const chartData = generateChartData();
+  const dailyChartData = generateDailyChartData();
 
   return (
     <div className="pnl-container">
@@ -264,18 +329,41 @@ function ProfitLoss() {
         </div>
       </div>
 
-      {/* Portfolio Value Over Time Chart */}
-      {chartData && (
+      {/* 30-Day Portfolio Value Chart */}
+      {dailyChartData && (
         <div className="chart-section">
-          <h3>Portfolio Value Over Time (Real Transaction History)</h3>
-          <div className="chart-container">
-            <Line data={chartData} options={chartOptions} />
+          <div className="chart-header">
+            <h3>Portfolio Value - Past {selectedDays} Days</h3>
+            <div className="chart-controls">
+              <label htmlFor="days-select">Time Period: </label>
+              <select
+                id="days-select"
+                value={selectedDays}
+                onChange={(e) => setSelectedDays(parseInt(e.target.value))}
+                className="days-dropdown"
+              >
+                <option value={7}>7 Days</option>
+                <option value={15}>15 Days</option>
+                <option value={30}>30 Days</option>
+                <option value={90}>90 Days</option>
+              </select>
+            </div>
           </div>
-          {historyData && (
+          <div className="chart-container">
+            <Line data={dailyChartData} options={chartOptions} />
+          </div>
+          {dailyChartData.metadata && (
             <div className="chart-info">
               <p>
-                Showing portfolio value at each transaction date. Total
-                transactions: {historyData.total_transactions}
+                <strong>{selectedDays}-Day Performance:</strong>{" "}
+                <span className={getPnlColor(dailyChartData.metadata.totalReturn)}>
+                  {formatCurrency(dailyChartData.metadata.totalReturn)} 
+                  ({dailyChartData.metadata.totalReturnPercent >= 0 ? "+" : ""}{dailyChartData.metadata.totalReturnPercent}%)
+                </span>
+              </p>
+              <p>
+                Starting Value: {formatCurrency(dailyChartData.metadata.startValue)} → 
+                Current Value: {formatCurrency(dailyChartData.metadata.endValue)}
               </p>
             </div>
           )}
