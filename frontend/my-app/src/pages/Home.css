@@ -1,0 +1,520 @@
+/* Home Page Layout */
+.home-container {
+  display: flex;
+  gap: 20px;
+  padding: 20px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* Main Content (75%) */
+.main-content {
+  flex: 3;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0; /* Allow flex item to shrink */
+}
+
+/* Sidebar (25%) */
+.sidebar {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 300px;
+}
+
+/* Summary Cards */
+.summary-cards {
+  display: flex;
+  gap: 15px;
+  min-width: 0;
+}
+
+.summary-card {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  text-align: center;
+  min-width: 0;
+  flex: 1;
+}
+
+.summary-card h3 {
+  margin: 0 0 10px 0;
+  color: #666;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.pnl-value {
+  font-size: 1.8rem;
+  font-weight: bold;
+  margin: 0;
+}
+
+.pnl-value.positive {
+  color: #22c55e;
+}
+
+.pnl-value.negative {
+  color: #ef4444;
+}
+
+.pnl-percentage {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-top: 5px;
+}
+
+.pnl-percentage.positive {
+  color: #22c55e;
+}
+
+.pnl-percentage.negative {
+  color: #ef4444;
+}
+
+/* Chart Section */
+.chart-section {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.chart-section h3 {
+  margin: 0 0 20px 0;
+  color: #333;
+}
+
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.chart-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.days-dropdown {
+  padding: 5px 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: white;
+}
+
+.chart-container {
+  height: 300px;
+  position: relative;
+}
+
+.chart-info {
+  margin-top: 15px;
+  padding: 10px;
+  background: #f8f9fa;
+  border-radius: 4px;
+  text-align: center;
+}
+
+.chart-info p {
+  margin: 0;
+  color: #6c757d;
+  font-size: 0.9em;
+}
+
+/* Holdings Section */
+.holdings-section {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.holdings-section h3 {
+  margin: 0 0 20px 0;
+  color: #333;
+}
+
+.holdings-table-container {
+  overflow-x: auto;
+}
+
+.holdings-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.holdings-table th {
+  background: #f8f9fa;
+  padding: 12px;
+  text-align: left;
+  font-weight: 600;
+  color: #666;
+  border-bottom: 2px solid #e9ecef;
+}
+
+.holdings-table td {
+  padding: 12px;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.holdings-table tr:hover {
+  background: #f8f9fa;
+}
+
+.table-row-even {
+  background-color: #fff;
+}
+
+.table-row-odd {
+  background-color: #f8f9fa;
+}
+
+.ticker-cell {
+  font-weight: bold;
+  color: #007bff;
+}
+
+.pnl-cell.positive {
+  color: #22c55e;
+  font-weight: 600;
+}
+
+.pnl-cell.negative {
+  color: #ef4444;
+  font-weight: 600;
+}
+
+.no-holdings {
+  text-align: center;
+  padding: 40px;
+  color: #666;
+}
+
+/* Performance Insights */
+.performance-insights {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.performance-insights h3 {
+  margin: 0 0 20px 0;
+  color: #333;
+}
+
+.insights-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 15px;
+}
+
+.insight-card {
+  padding: 15px;
+  background: #f8f9fa;
+  border-radius: 6px;
+}
+
+.insight-card h4 {
+  margin: 0 0 10px 0;
+  color: #333;
+  font-size: 1rem;
+}
+
+.insight-card p {
+  margin: 5px 0;
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.insight-detail {
+  font-size: 0.8rem !important;
+  color: #888 !important;
+  font-style: italic;
+  margin-top: 8px !important;
+}
+
+.status-indicator {
+  font-weight: bold;
+  font-size: 1rem;
+  margin-bottom: 8px;
+}
+
+.status-indicator.positive {
+  color: #22c55e;
+}
+
+.status-indicator.negative {
+  color: #ef4444;
+}
+
+/* Setup Section */
+.setup-section {
+  text-align: center;
+  padding: 20px;
+}
+
+.setup-button {
+  background-color: #007bff;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.setup-button:hover {
+  background-color: #0056b3;
+}
+
+/* Sidebar Components */
+.market-indices-section,
+.sector-breakdown-section {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.market-indices-section h3,
+.sector-breakdown-section h3 {
+  margin: 0 0 15px 0;
+  color: #333;
+  font-size: 1.1rem;
+}
+
+/* Market Indices */
+.indices-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.index-item {
+  padding: 12px;
+  background: #f8f9fa;
+  border-radius: 6px;
+  border-left: 4px solid #007bff;
+}
+
+.index-name {
+  font-weight: 600;
+  color: #333;
+  font-size: 0.9rem;
+  margin-bottom: 4px;
+}
+
+.index-value {
+  font-size: 1.1rem;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 2px;
+}
+
+.index-change {
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.index-change.positive {
+  color: #22c55e;
+}
+
+.index-change.negative {
+  color: #ef4444;
+}
+
+.loading-indices {
+  text-align: center;
+  color: #666;
+  font-style: italic;
+  padding: 20px;
+}
+
+/* Sector Breakdown */
+.pie-chart-container {
+  height: 250px;
+  position: relative;
+}
+
+.no-sectors {
+  text-align: center;
+  color: #666;
+  font-style: italic;
+  padding: 20px;
+}
+
+/* Sidebar Performance Insights */
+.performance-insights-sidebar {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  margin-top: 20px;
+}
+
+.performance-insights-sidebar h3 {
+  margin: 0 0 15px 0;
+  color: #333;
+  font-size: 1.1rem;
+}
+
+.insights-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 15px;
+}
+
+.insight-item {
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 15px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  transition: box-shadow 0.2s ease;
+}
+
+.insight-item:hover {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.insight-item h4 {
+  margin: 0 0 10px 0;
+  color: #333;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.insight-item p {
+  margin: 5px 0;
+  color: #666;
+  font-size: 0.85rem;
+}
+
+.insight-item .status-indicator {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+/* Loading and Error States */
+.loading-container {
+  text-align: center;
+  padding: 40px;
+}
+
+.loading-container h2 {
+  color: #666;
+}
+
+.error-container {
+  text-align: center;
+  padding: 40px;
+  background: #fef2f2;
+  border-radius: 8px;
+  border: 1px solid #fecaca;
+}
+
+.error-container h2 {
+  color: #dc2626;
+  margin: 0 0 10px 0;
+}
+
+.error-container p {
+  color: #666;
+  margin: 0 0 20px 0;
+}
+
+.error-container button {
+  background: #dc2626;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.error-container button:hover {
+  background: #b91c1c;
+}
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+  .home-container {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    min-width: auto;
+  }
+
+  .summary-cards {
+    flex-wrap: wrap;
+  }
+
+  .summary-card {
+    flex: 1 1 calc(50% - 5px);
+  }
+
+  .insights-grid {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .home-container {
+    padding: 10px;
+  }
+
+  .summary-cards {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .summary-card {
+    padding: 15px;
+    flex: none;
+  }
+
+  .pnl-value {
+    font-size: 1.5rem;
+  }
+
+  .chart-container {
+    height: 250px;
+  }
+
+  .insights-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .holdings-table {
+    font-size: 0.8rem;
+  }
+
+  .holdings-table th,
+  .holdings-table td {
+    padding: 8px;
+  }
+
+  .chart-header {
+    flex-direction: column;
+    gap: 10px;
+    align-items: flex-start;
+  }
+}
