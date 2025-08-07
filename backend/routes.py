@@ -4,7 +4,7 @@ from decimal import Decimal
 import yfinance as yf
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import CheckConstraint, func
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import pytz
 
 
@@ -202,93 +202,141 @@ def register_routes(app):
                 print("No transactions found")  # Debug print
                 return jsonify({'error': 'No transactions found'}), 404
 
-            # Calculate portfolio value at each transaction date
-            history_data = []
-            initial_cash = 100000  # Starting cash balance
-            current_cash = initial_cash
-            holdings = {}  # Track holdings at each point
-            local_tz = pytz.timezone('America/New_York')
-            for transaction in transactions:
-                date = transaction.transaction_date.astimezone(local_tz).strftime('%Y-%m-%d')
-                ticker = transaction.ticker
-                quantity = float(transaction.quantity)
-                price = float(transaction.price)
-                
-                if transaction.transaction_type == 'buy':
-                    # Update cash and holdings
-                    total_cost = quantity * price
-                    current_cash -= total_cost
-                    
-                    if ticker in holdings:
-                        # Update existing holding
-                        old_quantity = holdings[ticker]['quantity']
-                        old_cost = holdings[ticker]['cost_basis']
-                        new_quantity = old_quantity + quantity
-                        new_cost_basis = ((old_quantity * old_cost) + total_cost) / new_quantity
-                        holdings[ticker] = {
-                            'quantity': new_quantity,
-                            'cost_basis': new_cost_basis
-                        }
-                    else:
-                        # New holding
-                        holdings[ticker] = {
-                            'quantity': quantity,
-                            'cost_basis': price
-                        }
-                else:  # sell
-                    # Update cash and holdings
-                    total_proceeds = quantity * price
-                    current_cash += total_proceeds
-                    
-                    if ticker in holdings:
-                        holdings[ticker]['quantity'] -= quantity
-                        if holdings[ticker]['quantity'] <= 0:
-                            del holdings[ticker]
-                
-                # Calculate current portfolio value using transaction prices 
-                holdings_value = sum(
-                    holding['quantity'] * holding['cost_basis'] 
-                    for ticker, holding in holdings.items()
-                )
-                portfolio_value = current_cash + holdings_value
-                
-                history_data.append({
-                    'date': date,
-                    'portfolio_value': portfolio_value,
-                    'cash_balance': current_cash,
-                    'holdings_value': holdings_value,
-                    'transaction_type': transaction.transaction_type,
-                    'ticker': ticker,
-                    'quantity': quantity,
-                    'price': price
-                })
-            
-            # Add current state
-            current_holdings = Holding.query.filter_by(portfolio_id=portfolio.id).all()
-            current_holdings_value = sum(
-                float(holding.quantity) * get_current_price(holding.ticker)
-                for holding in current_holdings
-            )
-            current_portfolio_value = float(portfolio.cash_balance) + current_holdings_value
-            
-            history_data.append({
-                'date': 'Current',
-                'portfolio_value': current_portfolio_value,
-                'cash_balance': float(portfolio.cash_balance),
-                'holdings_value': current_holdings_value,
-                'transaction_type': 'current',
-                'ticker': None,
-                'quantity': None,
-                'price': None
-            })
-            
+            # Simple return of transaction data without complex calculations
             return jsonify({
-                'history': history_data,
+                'history': [{'date': t.transaction_date.strftime('%Y-%m-%d'), 
+                           'ticker': t.ticker, 
+                           'type': t.transaction_type} for t in transactions],
                 'total_transactions': len(transactions)
             })
             
         except Exception as e:
             return jsonify({'error': str(e)}), 500
+    
+    @app.route('/portfolio/daily-history/<int:days>', methods=['GET'])
+    def get_daily_portfolio_history(days=30):
+        """Get actual daily portfolio values based on historical transactions"""
+        try:
+            portfolio = Portfolio.query.filter_by(id=1).first()
+            if not portfolio:
+                return jsonify({'error': 'Portfolio not found'}), 404
+
+            # Date range
+            end_date = datetime.now().date()
+            start_date = end_date - timedelta(days=days-1)
+            
+            # Get all transactions up to end date, ordered by date
+            transactions = Transaction.query.filter(
+                Transaction.portfolio_id == portfolio.id,
+                Transaction.transaction_date <= datetime.combine(end_date, datetime.min.time())
+            ).order_by(Transaction.transaction_date.asc()).all()
+            
+            # Get all unique tickers from transactions
+            all_tickers = list(set([t.ticker for t in transactions]))
+            print(f"Fetching {days} days for {len(all_tickers)} stocks from transactions...")
+            
+            # Fetch ALL historical data for all tickers at once
+            historical_data = {}
+            for ticker in all_tickers:
+                try:
+                    stock = yf.Ticker(ticker)
+                    hist = stock.history(start=start_date, end=end_date + timedelta(days=1))
+                    historical_data[ticker] = hist['Close'].to_dict() if not hist.empty else {}
+                    print(f"✓ {ticker}")
+                except Exception as e:
+                    print(f"✗ {ticker}: {e}")
+                    historical_data[ticker] = {}
+            
+            initial_cash = 100000  # Starting cash
+            daily_snapshots = {}  # date -> {cash, holdings}
+            
+            # Get info for each day
+            for single_date in (start_date + timedelta(n) for n in range(days)):
+                # Get transactions up to this date
+                relevant_transactions = [t for t in transactions 
+                                       if t.transaction_date.date() <= single_date]
+                
+                # Replay transactions to get portfolio state on this date
+                cash = initial_cash
+                holdings = {}  # ticker -> {quantity, cost_basis}
+                
+                for transaction in relevant_transactions:
+                    ticker = transaction.ticker
+                    quantity = float(transaction.quantity)
+                    price = float(transaction.price)
+                    
+                    if transaction.transaction_type == 'buy':
+                        total_cost = quantity * price
+                        cash -= total_cost
+                        
+                        if ticker in holdings:
+                            # Update existing holding with weighted average cost
+                            old_quantity = holdings[ticker]['quantity']
+                            old_cost = holdings[ticker]['cost_basis']
+                            new_quantity = old_quantity + quantity
+                            new_cost_basis = ((old_quantity * old_cost) + total_cost) / new_quantity
+                            holdings[ticker] = {
+                                'quantity': new_quantity,
+                                'cost_basis': new_cost_basis
+                            }
+                        else:
+                            holdings[ticker] = {
+                                'quantity': quantity,
+                                'cost_basis': price
+                            }
+                    else:  # sell
+                        total_proceeds = quantity * price
+                        cash += total_proceeds
+                        
+                        if ticker in holdings:
+                            holdings[ticker]['quantity'] -= quantity
+                            if holdings[ticker]['quantity'] <= 0:
+                                del holdings[ticker]
+                
+                # Calculate portfolio value using historical prices for this date
+                holdings_value = 0
+                for ticker, holding_info in holdings.items():
+                    price = get_historical_price(ticker, single_date, historical_data)
+                    if price is None:
+                        price = holding_info['cost_basis']  # Fallback to cost basis
+                    holdings_value += holding_info['quantity'] * price
+                
+                portfolio_value = cash + holdings_value
+                
+                daily_snapshots[single_date] = {
+                    'date': single_date.strftime('%Y-%m-%d'),
+                    'portfolio_value': round(portfolio_value, 2),
+                    'cash_balance': round(cash, 2),
+                    'holdings_value': round(holdings_value, 2),
+                    'holdings_count': len(holdings)
+                }
+            
+            # Convert to list
+            daily_history = [daily_snapshots[date] for date in sorted(daily_snapshots.keys())]
+            
+            return jsonify({
+                'daily_history': daily_history,
+                'days_requested': days,
+                'start_date': start_date.strftime('%Y-%m-%d'),
+                'end_date': end_date.strftime('%Y-%m-%d'),
+                'total_transactions_processed': len(transactions)
+            })
+            
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+    
+    def get_historical_price(ticker, date, historical_data):
+        """Get historical price for a ticker on a specific date with fallback logic"""
+        if ticker not in historical_data:
+            return None
+        
+        # Try to find price for this date or nearby dates (within 5 days)
+        for day_offset in range(5):
+            check_date = date - timedelta(days=day_offset)
+            for price_date, price in historical_data[ticker].items():
+                if price_date.date() == check_date:
+                    return float(price)
+        return None
     
     # Utility function to get just the current price of a stock
     def get_current_price(ticker):
@@ -449,10 +497,28 @@ def register_routes(app):
             db.session.commit()
 
             holding = Holding(portfolio_id=portfolio.id, ticker='AAPL', quantity=Decimal('10'), cost_basis=Decimal('150.00'))
-            holding2 = Holding(portfolio_id=portfolio.id, ticker='GOOGL', quantity=Decimal('5'), cost_basis=Decimal('280.00'))
-            transaction = Transaction(portfolio_id=portfolio.id, ticker='AAPL', transaction_type='buy', price=Decimal('150.00'), quantity=Decimal('10'))
+            holding2 = Holding(portfolio_id=portfolio.id, ticker='GOOGL', quantity=Decimal('8'), cost_basis=Decimal('280.00'))
+            holding3 = Holding(portfolio_id=portfolio.id, ticker='NFLX', quantity=Decimal('5'), cost_basis=Decimal('280.00'))
+            holding4 = Holding(portfolio_id=portfolio.id, ticker='AMZN', quantity=Decimal('38'), cost_basis=Decimal('280.00'))
+            holding5 = Holding(portfolio_id=portfolio.id, ticker='VOO', quantity=Decimal('6'), cost_basis=Decimal('280.00'))
+            holding6 = Holding(portfolio_id=portfolio.id, ticker='MSFT', quantity=Decimal('29'), cost_basis=Decimal('280.00'))
+            transaction = Transaction(portfolio_id=portfolio.id, ticker='AAPL', transaction_type='buy', price=Decimal('150.00'), quantity=Decimal('10'), transaction_date=datetime.now()- timedelta(days=1, hours=2))
+            transaction2 = Transaction(portfolio_id=portfolio.id, ticker='NFLX', transaction_type='buy', price=Decimal('900.00'), quantity=Decimal('5'), transaction_date=datetime.now()- timedelta(days=4, hours=2))
+            transaction3 = Transaction(portfolio_id=portfolio.id, ticker='MSFT', transaction_type='buy', price=Decimal('520.00'), quantity=Decimal('29'), transaction_date=datetime.now()- timedelta(days=6, hours=2))
+            transaction4 = Transaction(portfolio_id=portfolio.id, ticker='AMZN', transaction_type='buy', price=Decimal('200.00'), quantity=Decimal('38'), transaction_date=datetime.now()- timedelta(days=9, hours=2))
+            transaction5 = Transaction(portfolio_id=portfolio.id, ticker='VOO', transaction_type='buy', price=Decimal('305.00'), quantity=Decimal('6'), transaction_date=datetime.now()- timedelta(days=24, hours=2))
+            transaction6 = Transaction(portfolio_id=portfolio.id, ticker='GOOGL', transaction_type='buy', price=Decimal('180.00'), quantity=Decimal('8'), transaction_date=datetime.now()- timedelta(days=37, hours=2))
             db.session.add(holding)
             db.session.add(holding2)
+            db.session.add(holding3)
+            db.session.add(holding4)
+            db.session.add(holding5)
+            db.session.add(holding6)
             db.session.add(transaction)
+            db.session.add(transaction2)
+            db.session.add(transaction3)
+            db.session.add(transaction4)
+            db.session.add(transaction5)
+            db.session.add(transaction6)
             db.session.commit()
             return jsonify({"message": "Database reset and default portfolio created.", "portfolio_id": portfolio.id}), 201
