@@ -489,6 +489,123 @@ def register_routes(app):
         
         except Exception as e:
             return jsonify({'error': str(e)}), 500
+        
+    @app.route('/market-indices', methods=['GET'])
+    def get_market_indices():
+        """Get real-time market indices data"""
+        try:
+            indices = [
+                {'name': 'Dow Jones', 'symbol': '^DJI'},
+                {'name': 'S&P 500', 'symbol': '^GSPC'},
+                {'name': 'NASDAQ', 'symbol': '^IXIC'},
+                {'name': 'Russell 2000', 'symbol': '^RUT'}
+            ]
+            
+            indices_data = []
+            
+            for index in indices:
+                try:
+                    stock = yf.Ticker(index['symbol'])
+                    info = stock.info
+                    
+                    if info.get('regularMarketPrice'):
+                        current_price = info.get('regularMarketPrice', 0)
+                        previous_close = info.get('previousClose', 0)
+                        change = current_price - previous_close
+                        percent_change = (change / previous_close * 100) if previous_close > 0 else 0
+                        
+                        indices_data.append({
+                            'name': index['name'],
+                            'symbol': index['symbol'],
+                            'value': round(current_price, 2),
+                            'change': round(change, 2),
+                            'percent_change': round(percent_change, 2)
+                        })
+                    else:
+                        # Fallback if data not available
+                        indices_data.append({
+                            'name': index['name'],
+                            'symbol': index['symbol'],
+                            'value': 0,
+                            'change': 0,
+                            'percent_change': 0
+                        })
+                        
+                except Exception as e:
+                    print(f"Error fetching {index['symbol']}: {str(e)}")
+                    # Add fallback data for this index
+                    indices_data.append({
+                        'name': index['name'],
+                        'symbol': index['symbol'],
+                        'value': 0,
+                        'change': 0,
+                        'percent_change': 0
+                    })
+            
+            return jsonify({'indices': indices_data})
+            
+        except Exception as e:
+            return jsonify({'error': f'Failed to fetch market indices: {str(e)}'}), 500
+
+    @app.route('/portfolio/sector-breakdown', methods=['GET'])
+    def get_sector_breakdown():
+        """Get sector breakdown of current holdings"""
+        try:
+            portfolio = Portfolio.query.filter_by(id=1).first()
+            if not portfolio:
+                return jsonify({'error': 'Portfolio not found'}), 404
+                
+            holdings = Holding.query.filter_by(portfolio_id=portfolio.id).all()
+            
+            if not holdings:
+                return jsonify({'sectors': []})
+            
+            # Calculate total portfolio value
+            total_value = float(portfolio.cash_balance)
+            sector_data = {}
+            
+            for holding in holdings:
+                current_price = get_current_price(holding.ticker)
+                market_value = float(holding.quantity) * current_price
+                total_value += market_value
+                
+                # Get sector information for this stock
+                try:
+                    stock = yf.Ticker(holding.ticker)
+                    info = stock.info
+                    sector = info.get('sector', 'Unknown')
+                    
+                    if sector in sector_data:
+                        sector_data[sector] += market_value
+                    else:
+                        sector_data[sector] = market_value
+                        
+                except Exception as e:
+                    print(f"Error fetching sector for {holding.ticker}: {str(e)}")
+                    # Use 'Unknown' sector if we can't get the data
+                    if 'Unknown' in sector_data:
+                        sector_data['Unknown'] += market_value
+                    else:
+                        sector_data['Unknown'] = market_value
+            
+            # Convert to percentages and format response
+            sectors = []
+            for sector, value in sector_data.items():
+                if value > 0:  # Only include sectors with holdings
+                    percentage = (value / total_value * 100) if total_value > 0 else 0
+                    sectors.append({
+                        'sector': sector,
+                        'value': round(value, 2),
+                        'percentage': round(percentage, 2)
+                    })
+            
+            # Sort by percentage (highest first)
+            sectors.sort(key=lambda x: x['percentage'], reverse=True)
+            
+            return jsonify({'sectors': sectors})
+            
+        except Exception as e:
+            return jsonify({'error': f'Failed to get sector breakdown: {str(e)}'}), 500
             
     # ---- FOR TESTING PURPOSES ONLY ----
     # Resetting the database and creating a default portfolio
