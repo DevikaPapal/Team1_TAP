@@ -68,7 +68,6 @@ def register_routes(app):
         total_cost = quantity * price
         if portfolio.cash_balance < total_cost:
             return jsonify({"error": "Insufficient cash balance to complete the purchase"}), 400
-
         try:
             portfolio.cash_balance -= total_cost
 
@@ -104,31 +103,27 @@ def register_routes(app):
                 "ticker": ticker,
                 "quantity": str(quantity),
                 "price": str(round(price,2)),
-                "execution_price": str(round(price,2)),  # Make it clear this is the execution price
+                "execution_price": str(round(price,2)),
                 "total_cost": str(round(quantity * price, 2)),
                 "new_cash_balance": str(round(portfolio.cash_balance, 2))
             }), 200
-
+        
         except Exception as e:
             db.session.rollback()
             return jsonify({"error": "An error occurred during the transaction.", "details": str(e)}), 500
-
-
+        
     # Function to handle sell transactions
     def handle_sell(portfolio, ticker, quantity, price):
         holding = Holding.query.filter_by(portfolio_id=portfolio.id, ticker=ticker).first()
-
         if not holding:
             return jsonify({"error": f"You do not own any shares of {ticker}"}), 400
-
         if quantity > holding.quantity:
-            return jsonify({"error": f"Sell quantity ({quantity}) exceeds holdings ({holding.quantity})"}), 400
-
+            return jsonify({"error": f"Sell quantity ({quantity}) exceeds holdings ({holding.quantity})"}), 400  
         try:
             total_sale_value = quantity * price
             portfolio.cash_balance += total_sale_value
             old_total_value = holding.quantity * holding.cost_basis
-            
+
             # Calculate realized P&L
             cost_basis_value = quantity * holding.cost_basis
             realized_pnl = total_sale_value - cost_basis_value
@@ -143,7 +138,6 @@ def register_routes(app):
                 transaction_date=datetime.now()
             )
             db.session.add(new_transaction)
-
             holding.quantity -= quantity
             if holding.quantity == 0:
                 db.session.delete(holding)
@@ -158,16 +152,15 @@ def register_routes(app):
                 "ticker": ticker,
                 "quantity": str(quantity),
                 "price": str(round(price, 2)),
-                "execution_price": str(round(price, 2)),  # Make it clear this is the execution price
+                "execution_price": str(round(price, 2)),# Make it clear this is the execution price
                 "total_proceeds": str(round(quantity * price, 2)),
                 "realized_pnl": str(round(realized_pnl, 2)),
                 "new_cash_balance": str(round(portfolio.cash_balance, 2))
             }), 200
-
         except Exception as e:
             db.session.rollback()
             return jsonify({"error": "An error occurred during the transaction.", "details": str(e)}), 500
-    
+        
     # Get all transactions for a specific portfolio
     @app.route('/transactions/<int:portfolio_id>', methods=['GET'])
     def get_transactions(portfolio_id):
@@ -263,7 +256,7 @@ def register_routes(app):
                 
                 # Replay transactions to get portfolio state on this date
                 cash = initial_cash
-                holdings = {}  # ticker -> {quantity, cost_basis}
+                holdings = {}  # ticker -> {quantity, cost_basis, total_cost_basis}
                 
                 for transaction in relevant_transactions:
                     ticker = transaction.ticker
@@ -277,42 +270,76 @@ def register_routes(app):
                         if ticker in holdings:
                             # Update existing holding with weighted average cost
                             old_quantity = holdings[ticker]['quantity']
-                            old_cost = holdings[ticker]['cost_basis']
+                            old_total_cost = holdings[ticker]['total_cost_basis']
                             new_quantity = old_quantity + quantity
-                            new_cost_basis = ((old_quantity * old_cost) + total_cost) / new_quantity
+                            new_total_cost = old_total_cost + total_cost
+                            
                             holdings[ticker] = {
                                 'quantity': new_quantity,
-                                'cost_basis': new_cost_basis
+                                'cost_basis': new_total_cost / new_quantity,  # Average cost per share
+                                'total_cost_basis': new_total_cost
                             }
                         else:
                             holdings[ticker] = {
                                 'quantity': quantity,
-                                'cost_basis': price
+                                'cost_basis': price,  # Average cost per share
+                                'total_cost_basis': total_cost
                             }
+                            
                     else:  # sell
                         total_proceeds = quantity * price
                         cash += total_proceeds
                         
                         if ticker in holdings:
-                            holdings[ticker]['quantity'] -= quantity
-                            if holdings[ticker]['quantity'] <= 0:
+                            # Calculate realized PnL for this sale
+                            sale_cost_basis = holdings[ticker]['cost_basis'] * quantity
+                            realized_pnl = total_proceeds - sale_cost_basis
+                            
+                            # Calculate updated cost basis based on average of all shares held
+                            remaining_quantity = holdings[ticker]['quantity'] - quantity
+                            if remaining_quantity > 0:
+                                old_total_value = holdings[ticker]['quantity'] * holdings[ticker]['cost_basis']
+                                new_total_value = old_total_value - (price * quantity)
+                                
+                                holdings[ticker] = {
+                                    'quantity': remaining_quantity,
+                                    'cost_basis': new_total_value / remaining_quantity,  # Average cost per share
+                                    'total_cost_basis': new_total_value
+                                }
+                            else:
+                                # All shares sold, remove holding
                                 del holdings[ticker]
                 
-                # Calculate portfolio value using historical prices for this date
+                # Calculate portfolio value and PnL for this date
                 holdings_value = 0
+                total_cost_basis = 0
                 for ticker, holding_info in holdings.items():
                     price = get_historical_price(ticker, single_date, historical_data)
                     if price is None:
                         price = holding_info['cost_basis']  # Fallback to cost basis
                     holdings_value += holding_info['quantity'] * price
+                    total_cost_basis += holding_info['total_cost_basis']
                 
                 portfolio_value = cash + holdings_value
+                unrealized_pnl = holdings_value - total_cost_basis
+                
+                # Calculate cumulative realized PnL up to this date
+                realized_pnl_up_to_date = 0
+                for transaction in relevant_transactions:
+                    if transaction.transaction_type == 'sell':
+                        realized_pnl_up_to_date += float(transaction.realized_pnl or 0)
+                
+                combined_pnl = unrealized_pnl + realized_pnl_up_to_date
                 
                 daily_snapshots[single_date] = {
                     'date': single_date.strftime('%Y-%m-%d'),
                     'portfolio_value': round(portfolio_value, 2),
                     'cash_balance': round(cash, 2),
                     'holdings_value': round(holdings_value, 2),
+                    'total_cost_basis': round(total_cost_basis, 2),
+                    'unrealized_pnl': round(unrealized_pnl, 2),
+                    'realized_pnl': round(realized_pnl_up_to_date, 2),
+                    'combined_pnl': round(combined_pnl, 2),
                     'holdings_count': len(holdings)
                 }
             
