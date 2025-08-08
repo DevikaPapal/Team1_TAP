@@ -1,21 +1,23 @@
 import React, { useState, useEffect } from "react";
-import { Line } from "react-chartjs-2";
 import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
-  LineElement,
   PointElement,
+  LineElement,
+  Title,
   Tooltip,
   Legend,
 } from "chart.js";
+import { Line } from "react-chartjs-2";
 import "./ProfitLoss.css";
 
 ChartJS.register(
   CategoryScale,
   LinearScale,
-  LineElement,
   PointElement,
+  LineElement,
+  Title,
   Tooltip,
   Legend
 );
@@ -116,11 +118,16 @@ function ProfitLoss() {
     return `${value >= 0 ? "+" : ""}${value.toFixed(2)}%`;
   };
 
-  // Create chart data from daily portfolio history (past 30 days)
-  const generateDailyChartData = () => {
-    if (!dailyHistoryData?.daily_history || dailyHistoryData.daily_history.length === 0) return null;
+  // Generate P&L chart data using combined PnL from backend
+  const generatePnlChartData = () => {
+    if (!dailyHistoryData || !portfolio || !pnlData) {
+      console.log("Missing data:", { dailyHistoryData, portfolio, pnlData });
+      return null;
+    }
 
-    const labels = dailyHistoryData.daily_history.map((item) => {
+    // Extract data from the API response format
+    const dailyHistory = dailyHistoryData.daily_history || [];
+    const labels = dailyHistory.map((item) => {
       const date = new Date(item.date);
       return date.toLocaleDateString("en-US", {
         month: "short",
@@ -128,23 +135,41 @@ function ProfitLoss() {
       });
     });
 
-    const portfolioValues = dailyHistoryData.daily_history.map(
-      (item) => item.portfolio_value
-    );
+    // Use the combined PnL from backend
+    const pnlValues = dailyHistory.map((item) => item.combined_pnl || 0);
+    if (pnlData && pnlValues.length > 0) {
+      const currentTotalPnl =
+        pnlData.total_unrealized_pnl + pnlData.total_realized_pnl;
+      pnlValues[pnlValues.length - 1] = currentTotalPnl;
+    }
 
-    const startValue = portfolioValues[0];
-    const endValue = portfolioValues[portfolioValues.length - 1];
+    console.log("Chart data:", {
+      dailyHistory: dailyHistory.length,
+      labels,
+      pnlValues,
+      currentPnl: pnlData
+        ? pnlData.total_unrealized_pnl + pnlData.total_realized_pnl
+        : null,
+    });
+
+    const startValue = pnlValues[0];
+    const endValue = pnlValues[pnlValues.length - 1];
     const totalReturn = endValue - startValue;
     const totalReturnPercent = ((totalReturn / startValue) * 100).toFixed(2);
+
+    console.log("P&L values:", pnlValues);
 
     return {
       labels: labels,
       datasets: [
         {
-          label: "Portfolio Value",
-          data: portfolioValues,
+          label: "Total P&L (Realized + Unrealized)",
+          data: pnlValues,
           borderColor: totalReturn >= 0 ? "#22c55e" : "#ef4444",
-          backgroundColor: totalReturn >= 0 ? "rgba(34, 197, 94, 0.1)" : "rgba(239, 68, 68, 0.1)",
+          backgroundColor:
+            totalReturn >= 0
+              ? "rgba(34, 197, 94, 0.1)"
+              : "rgba(239, 68, 68, 0.1)",
           fill: true,
           tension: 0.4,
         },
@@ -154,43 +179,8 @@ function ProfitLoss() {
         totalReturnPercent,
         startValue,
         endValue,
-        days: dailyHistoryData.daily_history.length
-      }
-    };
-  };
-
-  // Create chart data from real transaction history
-  const generateChartData = () => {
-    if (!historyData?.history || historyData.history.length === 0) return null;
-
-    const labels = historyData.history.map((item) => {
-      if (item.date === "Current") {
-        return "Current";
-      }
-      const [year, month, day] = item.date.split("-");
-      const date = new Date(year, month - 1, day);
-      return date.toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-      });
-    });
-
-    const portfolioValues = historyData.history.map(
-      (item) => item.portfolio_value
-    );
-
-    return {
-      labels: labels,
-      datasets: [
-        {
-          label: "Portfolio Value",
-          data: portfolioValues,
-          borderColor: "#22c55e",
-          backgroundColor: "rgba(34, 197, 94, 0.1)",
-          fill: true,
-          tension: 0.4,
-        },
-      ],
+        days: dailyHistory.length,
+      },
     };
   };
 
@@ -215,16 +205,14 @@ function ProfitLoss() {
       y: {
         beginAtZero: false,
         min: function (context) {
-          // Set minimum to show the range of portfolio values more clearly
           const values = context.chart.data.datasets[0].data;
           const minValue = Math.min(...values);
-          return minValue - minValue * 0.01; // Add 1% padding below
+          return minValue - minValue * 0.01;
         },
         max: function (context) {
-          // Set maximum to show the range of portfolio values more clearly
           const values = context.chart.data.datasets[0].data;
           const maxValue = Math.max(...values);
-          return maxValue + maxValue * 0.01; // Add 1% padding above
+          return maxValue + maxValue * 0.01;
         },
         ticks: {
           callback: function (value) {
@@ -233,7 +221,7 @@ function ProfitLoss() {
         },
         title: {
           display: true,
-          text: "Portfolio Value ($)",
+          text: "Total P&L ($)",
         },
       },
       x: {
@@ -243,15 +231,9 @@ function ProfitLoss() {
           text: "Date",
         },
         ticks: {
-          maxTicksLimit: 8, // Limit the number of date labels to prevent crowding
-          maxRotation: 45,
-          minRotation: 45,
+          maxTicksLimit: 8,
         },
       },
-    },
-    interaction: {
-      intersect: false,
-      mode: "index",
     },
   };
 
@@ -272,9 +254,6 @@ function ProfitLoss() {
       </div>
     );
   }
-
-  const chartData = generateChartData();
-  const dailyChartData = generateDailyChartData();
 
   return (
     <div className="pnl-container">
@@ -300,28 +279,6 @@ function ProfitLoss() {
         </div>
 
         <div className="summary-card">
-          <h3>Unrealized P&L</h3>
-          <div
-            className={`pnl-value ${getPnlColor(
-              pnlData?.total_unrealized_pnl || 0
-            )}`}
-          >
-            {formatCurrency(pnlData?.total_unrealized_pnl || 0)}
-          </div>
-        </div>
-
-        <div className="summary-card">
-          <h3>Realized P&L</h3>
-          <div
-            className={`pnl-value ${getPnlColor(
-              pnlData?.total_realized_pnl || 0
-            )}`}
-          >
-            {formatCurrency(pnlData?.total_realized_pnl || 0)}
-          </div>
-        </div>
-
-        <div className="summary-card">
           <h3>Portfolio Value</h3>
           <div className="pnl-value">
             {formatCurrency(portfolio?.total_value || 0)}
@@ -329,46 +286,48 @@ function ProfitLoss() {
         </div>
       </div>
 
-      {/* 30-Day Portfolio Value Chart */}
-      {dailyChartData && (
-        <div className="chart-section">
-          <div className="chart-header">
-            <h3>Portfolio Value - Past {selectedDays} Days</h3>
-            <div className="chart-controls">
-              <label htmlFor="days-select">Time Period: </label>
-              <select
-                id="days-select"
-                value={selectedDays}
-                onChange={(e) => setSelectedDays(parseInt(e.target.value))}
-                className="days-dropdown"
-              >
-                <option value={7}>7 Days</option>
-                <option value={15}>15 Days</option>
-                <option value={30}>30 Days</option>
-                <option value={90}>90 Days</option>
-              </select>
-            </div>
+      {/* P&L Chart Section */}
+      <div className="chart-section">
+        <div className="chart-header">
+          <h3>Total P&L Performance Over Time</h3>
+          <div className="chart-controls">
+            <label htmlFor="days-select">Time Period:</label>
+            <select
+              id="days-select"
+              value={selectedDays}
+              onChange={(e) => setSelectedDays(Number(e.target.value))}
+            >
+              <option value={7}>7 Days</option>
+              <option value={14}>14 Days</option>
+              <option value={30}>30 Days</option>
+              <option value={90}>90 Days</option>
+            </select>
           </div>
-          <div className="chart-container">
-            <Line data={dailyChartData} options={chartOptions} />
-          </div>
-          {dailyChartData.metadata && (
-            <div className="chart-info">
-              <p>
-                <strong>{selectedDays}-Day Performance:</strong>{" "}
-                <span className={getPnlColor(dailyChartData.metadata.totalReturn)}>
-                  {formatCurrency(dailyChartData.metadata.totalReturn)} 
-                  ({dailyChartData.metadata.totalReturnPercent >= 0 ? "+" : ""}{dailyChartData.metadata.totalReturnPercent}%)
-                </span>
-              </p>
-              <p>
-                Starting Value: {formatCurrency(dailyChartData.metadata.startValue)} → 
-                Current Value: {formatCurrency(dailyChartData.metadata.endValue)}
-              </p>
-            </div>
-          )}
         </div>
-      )}
+        <div className="chart-container">
+          {(() => {
+            console.log("Chart rendering check:", {
+              dailyHistoryData: !!dailyHistoryData,
+              generatePnlChartData: !!generatePnlChartData(),
+            });
+            return dailyHistoryData && generatePnlChartData() ? (
+              <Line data={generatePnlChartData()} options={chartOptions} />
+            ) : (
+              <div className="chart-loading">
+                <p>Loading chart data...</p>
+                <p>
+                  Debug: dailyHistoryData ={" "}
+                  {dailyHistoryData ? "true" : "false"}
+                </p>
+                <p>
+                  Debug: generatePnlChartData ={" "}
+                  {generatePnlChartData() ? "true" : "false"}
+                </p>
+              </div>
+            );
+          })()}
+        </div>
+      </div>
 
       {/* Portfolio Breakdown */}
       <div className="breakdown-section">
@@ -462,120 +421,6 @@ function ProfitLoss() {
           <p>Cash: {formatCurrency(portfolio?.cash_balance || 0)}</p>
         </div>
       )}
-
-      {/* Performance Insights */}
-      <div className="performance-insights">
-        <h3>Performance Insights</h3>
-        <div className="insights-grid">
-          <div className="insight-card">
-            <h4>Best Performer</h4>
-            {portfolio?.holdings && portfolio.holdings.length > 0 ? (
-              (() => {
-                const bestHolding = portfolio.holdings.reduce(
-                  (best, current) => {
-                    const currentReturn =
-                      parseFloat(current.unrealized_pnl || 0) /
-                      (parseFloat(current.cost_basis) *
-                        parseFloat(current.quantity));
-                    const bestReturn =
-                      parseFloat(best.unrealized_pnl || 0) /
-                      (parseFloat(best.cost_basis) * parseFloat(best.quantity));
-                    return currentReturn > bestReturn ? current : best;
-                  }
-                );
-                const returnPercentage =
-                  (parseFloat(bestHolding.unrealized_pnl || 0) /
-                    (parseFloat(bestHolding.cost_basis) *
-                      parseFloat(bestHolding.quantity))) *
-                  100;
-                return (
-                  <div>
-                    <p>
-                      <strong>{bestHolding.ticker}</strong>
-                    </p>
-                    <p className={`${getPnlColor(returnPercentage)}`}>
-                      {formatPercentage(returnPercentage)}
-                    </p>
-                  </div>
-                );
-              })()
-            ) : (
-              <p>No holdings yet</p>
-            )}
-          </div>
-
-          <div className="insight-card">
-            <h4>Worst Performer</h4>
-            {portfolio?.holdings && portfolio.holdings.length > 0 ? (
-              (() => {
-                const worstHolding = portfolio.holdings.reduce(
-                  (worst, current) => {
-                    const currentReturn =
-                      parseFloat(current.unrealized_pnl || 0) /
-                      (parseFloat(current.cost_basis) *
-                        parseFloat(current.quantity));
-                    const worstReturn =
-                      parseFloat(worst.unrealized_pnl || 0) /
-                      (parseFloat(worst.cost_basis) *
-                        parseFloat(worst.quantity));
-                    return currentReturn < worstReturn ? current : worst;
-                  }
-                );
-                const returnPercentage =
-                  (parseFloat(worstHolding.unrealized_pnl || 0) /
-                    (parseFloat(worstHolding.cost_basis) *
-                      parseFloat(worstHolding.quantity))) *
-                  100;
-                return (
-                  <div>
-                    <p>
-                      <strong>{worstHolding.ticker}</strong>
-                    </p>
-                    <p className={`${getPnlColor(returnPercentage)}`}>
-                      {formatPercentage(returnPercentage)}
-                    </p>
-                    <p className="insight-detail">
-                      {returnPercentage < 0
-                        ? `Down ${Math.abs(returnPercentage).toFixed(
-                            2
-                          )}% from cost basis`
-                        : `Up ${returnPercentage.toFixed(2)}% from cost basis`}
-                    </p>
-                  </div>
-                );
-              })()
-            ) : (
-              <p>No holdings yet</p>
-            )}
-          </div>
-
-          <div className="insight-card">
-            <h4>Portfolio Status</h4>
-            <div
-              className={`status-indicator ${getPnlColor(calculateTotalPnl())}`}
-            >
-              {calculateTotalPnl() >= 0 ? "Profitable" : "At Loss"}
-            </div>
-            <p>
-              {calculateTotalPnl() >= 0
-                ? "Your portfolio is currently profitable!"
-                : "Your portfolio is currently at a loss."}
-            </p>
-          </div>
-
-          <div className="insight-card">
-            <h4>Cash Position</h4>
-            <p>
-              <strong>{formatCurrency(portfolio?.cash_balance || 0)}</strong>
-            </p>
-            <p>
-              {portfolio?.cash_balance > 0
-                ? "You have cash available for new investments."
-                : "No cash available for new investments."}
-            </p>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
