@@ -81,9 +81,60 @@
   color: #333;
 }
 
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.chart-header h3 {
+  margin: 0;
+  color: #333;
+}
+
+.chart-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.chart-controls label {
+  font-weight: 500;
+  color: #666;
+}
+
+.chart-controls select {
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: white;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.chart-controls select:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
 .chart-container {
   height: 300px;
   position: relative;
+}
+
+.chart-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 300px;
+  color: #666;
+}
+
+.chart-loading p {
+  margin: 0;
+  font-size: 16px;
 }
 
 .chart-info {
@@ -358,5 +409,57 @@
   .holdings-table th,
   .holdings-table td {
     padding: 8px;
+  }
+
+  /* Chart Header and Controls */
+  .chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+  }
+
+  .chart-header h3 {
+    margin: 0;
+    color: #333;
+  }
+
+  .chart-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .chart-controls label {
+    font-weight: 500;
+    color: #666;
+  }
+
+  .chart-controls select {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: white;
+    font-size: 14px;
+    cursor: pointer;
+  }
+
+  .chart-controls select:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+  }
+
+  .chart-loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 300px;
+    color: #666;
+  }
+
+  .chart-loading p {
+    margin: 0;
+    font-size: 16px;
   }
 }
