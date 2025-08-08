@@ -500,7 +500,7 @@ function Trades() {
 
           
           <div className="stocks-sections-container">
-            {previousStocks.length == 0 && (              
+            {previousStocks.length === 0 && (              
             <div className="popular-stocks">
               <p className="popular-stocks-label">Popular stocks:</p>
               <div className="popular-stock-buttons">
@@ -551,10 +551,10 @@ function Trades() {
               
               <div className="quote-price-section">
                 <p className="quote-main-price">
-                  <strong>${searchResult.price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong>
+                  <strong>${searchResult.price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 4})}</strong>
                 </p>
                 <p className={searchResult.change >= 0 ? "positive-change" : "negative-change"}>
-                  ${searchResult.change.toFixed(2)} ({searchResult.percent_change.toFixed(2)}%)
+                  ${searchResult.change.toFixed(4)} ({searchResult.percent_change.toFixed(2)}%)
                 </p>
               </div>
 
@@ -620,10 +620,10 @@ function Trades() {
               
               <div className="quote-price-section">
                 <p className="quote-main-price">
-                  <strong>${tradeQuote.price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong>
+                  <strong>${tradeQuote.price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 4})}</strong>
                 </p>
                 <p className={tradeQuote.change >= 0 ? "positive-change" : "negative-change"}>
-                  ${tradeQuote.change.toFixed(2)} ({tradeQuote.percent_change.toFixed(2)}%)
+                  ${tradeQuote.change.toFixed(4)} ({tradeQuote.percent_change.toFixed(2)}%)
                 </p>
               </div>
 
