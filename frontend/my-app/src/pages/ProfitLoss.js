@@ -357,9 +357,7 @@ function ProfitLoss() {
       </div>
     );
   }
-
-  const chartData = generateChartData();
-  const dailyChartData = generateDailyChartData();
+  
   const sortedHoldings = getSortedHoldings();
 
   return (

@@ -471,7 +471,7 @@ function Trades() {
   if (loading) {
     return (
       <div className="loading-container">
-        <h2>Loading Portfolio...</h2>
+        <h2>Loading Trading Dashboard...</h2>
       </div>
     );
   }
@@ -479,7 +479,7 @@ function Trades() {
   if (error) {
     return (
       <div className="error-container">
-        <h2>Error Loading Portfolio</h2>
+        <h2>Error Loading Trading Dashboard</h2>
         <p>{error}</p>
         <button onClick={fetchPortfolio}>Retry</button>
       </div>

@@ -27,7 +27,7 @@ function Home() {
   const [portfolio, setPortfolio] = useState(null);
   const [pnlData, setPnlData] = useState(null);
   const [dailyHistoryData, setDailyHistoryData] = useState(null);
-  const [selectedDays, setSelectedDays] = useState(7);
+  const [selectedDays, setSelectedDays] = useState(30);
   const [marketIndices, setMarketIndices] = useState(null);
   const [sectorBreakdown, setSectorBreakdown] = useState(null);
   const [loading, setLoading] = useState(true);
