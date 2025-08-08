@@ -30,6 +30,12 @@ function Trades() {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [pendingTrade, setPendingTrade] = useState(null);
 
+  // Transaction sorting state
+  const [transactionSortConfig, setTransactionSortConfig] = useState({ 
+    key: 'transaction_date', 
+    direction: 'desc' // Default to newest first
+  });
+
   useEffect(() => {
     fetchPortfolio();
   }, []);
@@ -341,6 +347,43 @@ function Trades() {
   const cancelTrade = () => {
     setShowConfirmDialog(false);
     setPendingTrade(null);
+  };
+
+  // Transaction sorting functions
+  const handleTransactionSort = (key) => {
+    if (key === 'transaction_date') {
+      // Toggle between asc (oldest first, up arrow) and desc (newest first, down arrow)
+      const newDirection = transactionSortConfig.direction === 'asc' ? 'desc' : 'asc';
+      setTransactionSortConfig({ key: 'transaction_date', direction: newDirection });
+    }
+  };
+
+  const getSortedTransactions = () => {
+    if (!transactions || transactions.length === 0) return [];
+    
+    const sortableTransactions = [...transactions];
+    // Always sort by transaction_date since that's the only sortable column
+    sortableTransactions.sort((a, b) => {
+      const aValue = new Date(a.transaction_date);
+      const bValue = new Date(b.transaction_date);
+      
+      if (aValue < bValue) {
+        return transactionSortConfig.direction === 'asc' ? -1 : 1;
+      }
+      if (aValue > bValue) {
+        return transactionSortConfig.direction === 'asc' ? 1 : -1;
+      }
+      return 0;
+    });
+    
+    return sortableTransactions;
+  };
+
+  const getTransactionSortIcon = (columnKey) => {
+    if (columnKey === 'transaction_date') {
+      return transactionSortConfig.direction === 'asc' ? ' ↑' : ' ↓';
+    }
+    return '';
   };
 
   // Helper function to format market cap
@@ -696,16 +739,33 @@ function Trades() {
               <table className="holdings-table">
                 <thead className="table-header">
                   <tr>
-                    <th className="table-header-cell table-header-cell-left">Date</th>
-                    <th className="table-header-cell table-header-cell-left">Ticker</th>
-                    <th className="table-header-cell table-header-cell-left">Type</th>
-                    <th className="table-header-cell table-header-cell-left">Quantity</th>
-                    <th className="table-header-cell table-header-cell-left">Price</th>
-                    <th className="table-header-cell table-header-cell-left">Total</th>
+                    <th 
+                      className="table-header-cell table-header-cell-left"
+                      onClick={() => handleTransactionSort('transaction_date')}
+                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                      title="Click to sort by date"
+                    >
+                      Date{getTransactionSortIcon('transaction_date')}
+                    </th>
+                    <th className="table-header-cell table-header-cell-left">
+                      Ticker
+                    </th>
+                    <th className="table-header-cell table-header-cell-left">
+                      Type
+                    </th>
+                    <th className="table-header-cell table-header-cell-left">
+                      Quantity
+                    </th>
+                    <th className="table-header-cell table-header-cell-left">
+                      Price
+                    </th>
+                    <th className="table-header-cell table-header-cell-left">
+                      Total
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {transactions.map((transaction, index) => (
+                  {getSortedTransactions().map((transaction, index) => (
                     <tr key={transaction.id} className={index % 2 === 0 ? "table-row-even" : "table-row-odd"}>
                       <td className="table-cell table-cell-left">
                         {(() => {

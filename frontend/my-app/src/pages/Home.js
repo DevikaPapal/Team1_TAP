@@ -149,26 +149,6 @@ function Home() {
     }
   };
 
-  const setupPortfolio = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch("http://localhost:5001/setup", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
-      if (!response.ok) {
-        throw new Error("Failed to setup portfolio");
-      }
-      // After setup, fetch the portfolio data
-      await fetchData();
-    } catch (err) {
-      setError(err.message);
-      setLoading(false);
-    }
-  };
-
   const calculateTotalPnl = () => {
     if (!pnlData) return 0;
     return pnlData.total_unrealized_pnl + pnlData.total_realized_pnl;
@@ -197,7 +177,6 @@ function Home() {
     return `${value >= 0 ? "+" : ""}${value.toFixed(2)}%`;
   };
 
-  // Sorting function for holdings table
   const handleSort = (key) => {
     let direction = 'asc';
     if (sortConfig.key === key) {
@@ -584,7 +563,7 @@ function Home() {
                     >
                       Quantity{getSortIcon('quantity')}
                     </th>
-                    <Tooltip title="Cost basis is calculated using the weighted average of all purchases for this holding.">
+                    <Tooltip title="Cost basis is calculated using the weighted average of all purchases for this holding." placement="top">
                       <th 
                         onClick={() => handleSort('cost_basis')} 
                         style={{ cursor: 'pointer', userSelect: 'none' }}
@@ -593,7 +572,7 @@ function Home() {
                         Cost Basis{getSortIcon('cost_basis')}
                       </th>
                     </Tooltip>
-                    <Tooltip title="Current price is the latest market price for this holding.">
+                    <Tooltip title="Current price is the latest market price for this holding." placement="top">
                       <th 
                         onClick={() => handleSort('current_price')} 
                         style={{ cursor: 'pointer', userSelect: 'none' }}
@@ -602,7 +581,7 @@ function Home() {
                         Current Price{getSortIcon('current_price')}
                       </th>
                     </Tooltip>
-                    <Tooltip title="Market value is the current market price multiplied by the quantity held.">
+                    <Tooltip title="Market value is the current market price multiplied by the quantity held." placement="top">
                       <th 
                         onClick={() => handleSort('market_value')} 
                         style={{ cursor: 'pointer', userSelect: 'none' }}
@@ -611,7 +590,7 @@ function Home() {
                         Market Value{getSortIcon('market_value')}
                       </th>
                     </Tooltip>
-                    <Tooltip title="Unrealized P&L is the profit or loss if you were to sell this holding at the current market price.">
+                    <Tooltip title="Unrealized P&L is the profit or loss if you were to sell this holding at the current market price." placement="top">
                       <th 
                         onClick={() => handleSort('unrealized_pnl')} 
                         style={{ cursor: 'pointer', userSelect: 'none' }}
