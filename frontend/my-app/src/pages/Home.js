@@ -6,10 +6,11 @@ import {
   LinearScale,
   LineElement,
   PointElement,
-  Tooltip,
+  Tooltip as ChartTooltip,
   Legend,
   ArcElement,
 } from "chart.js";
+import Tooltip from '@mui/material/Tooltip';
 import "./Home.css";
 
 ChartJS.register(
@@ -17,7 +18,7 @@ ChartJS.register(
   LinearScale,
   LineElement,
   PointElement,
-  Tooltip,
+  ChartTooltip,
   Legend,
   ArcElement
 );
@@ -26,11 +27,12 @@ function Home() {
   const [portfolio, setPortfolio] = useState(null);
   const [pnlData, setPnlData] = useState(null);
   const [dailyHistoryData, setDailyHistoryData] = useState(null);
-  const [selectedDays, setSelectedDays] = useState(7);
+  const [selectedDays, setSelectedDays] = useState(30);
   const [marketIndices, setMarketIndices] = useState(null);
   const [sectorBreakdown, setSectorBreakdown] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
 
   useEffect(() => {
     fetchData();
@@ -48,6 +50,14 @@ function Home() {
     return () => clearInterval(interval);
   }, []);
 
+  // Auto-refresh portfolio data every 1 second for real-time updates
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchPortfolioData();
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   const fetchMarketIndices = async () => {
     try {
       const response = await fetch("http://localhost:5001/market-indices");
@@ -57,6 +67,26 @@ function Home() {
       }
     } catch (err) {
       console.log("Failed to fetch market indices:", err.message);
+    }
+  };
+
+  const fetchPortfolioData = async () => {
+    try {
+      // Fetch portfolio data silently without loading state
+      const portfolioResponse = await fetch("http://localhost:5001/portfolio");
+      if (portfolioResponse.ok) {
+        const portfolioData = await portfolioResponse.json();
+        setPortfolio(portfolioData);
+      }
+
+      // Fetch P&L data 
+      const pnlResponse = await fetch("http://localhost:5001/pnl");
+      if (pnlResponse.ok) {
+        const pnlData = await pnlResponse.json();
+        setPnlData(pnlData);
+      }
+    } catch (err) {
+      console.log("Failed to fetch real-time portfolio data:", err.message);
     }
   };
 
@@ -119,26 +149,6 @@ function Home() {
     }
   };
 
-  const setupPortfolio = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch("http://localhost:5001/setup", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
-      if (!response.ok) {
-        throw new Error("Failed to setup portfolio");
-      }
-      // After setup, fetch the portfolio data
-      await fetchData();
-    } catch (err) {
-      setError(err.message);
-      setLoading(false);
-    }
-  };
-
   const calculateTotalPnl = () => {
     if (!pnlData) return 0;
     return pnlData.total_unrealized_pnl + pnlData.total_realized_pnl;
@@ -165,6 +175,76 @@ function Home() {
 
   const formatPercentage = (value) => {
     return `${value >= 0 ? "+" : ""}${value.toFixed(2)}%`;
+  };
+
+  const handleSort = (key) => {
+    let direction = 'asc';
+    if (sortConfig.key === key) {
+      if (sortConfig.direction === 'asc') {
+        direction = 'desc';
+      } else if (sortConfig.direction === 'desc') {
+        // Third click: reset to default (unsorted)
+        setSortConfig({ key: null, direction: 'asc' });
+        return;
+      }
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const getSortedHoldings = () => {
+    if (!portfolio?.holdings) return [];
+    
+    const sortableHoldings = [...portfolio.holdings];
+    if (sortConfig.key) {
+      sortableHoldings.sort((a, b) => {
+        let aValue, bValue;
+        
+        switch (sortConfig.key) {
+          case 'ticker':
+            aValue = a.ticker;
+            bValue = b.ticker;
+            break;
+          case 'quantity':
+            aValue = parseFloat(a.quantity);
+            bValue = parseFloat(b.quantity);
+            break;
+          case 'cost_basis':
+            aValue = parseFloat(a.cost_basis);
+            bValue = parseFloat(b.cost_basis);
+            break;
+          case 'current_price':
+            aValue = parseFloat(a.current_price);
+            bValue = parseFloat(b.current_price);
+            break;
+          case 'market_value':
+            aValue = parseFloat(a.market_value);
+            bValue = parseFloat(b.market_value);
+            break;
+          case 'unrealized_pnl':
+            aValue = parseFloat(a.unrealized_pnl);
+            bValue = parseFloat(b.unrealized_pnl);
+            break;
+          default:
+            return 0;
+        }
+
+        if (aValue < bValue) {
+          return sortConfig.direction === 'asc' ? -1 : 1;
+        }
+        if (aValue > bValue) {
+          return sortConfig.direction === 'asc' ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+    return sortableHoldings;
+  };
+
+  const getSortIcon = (columnKey) => {
+    if (sortConfig.key !== columnKey) {
+      return ' ⇅'; // Clean up-down arrows when not sorted
+    }
+    return sortConfig.direction === 'asc' ? ' ↑' : ' ↓';
   };
 
   // Create chart data from daily portfolio history
@@ -375,6 +455,7 @@ function Home() {
 
   const dailyChartData = generateDailyChartData();
   const sectorPieData = generateSectorPieData();
+  const sortedHoldings = getSortedHoldings();
 
   return (
     <div className="home-container">
@@ -468,16 +549,60 @@ function Home() {
               <table className="holdings-table">
                 <thead>
                   <tr>
-                    <th>Ticker</th>
-                    <th>Quantity</th>
-                    <th>Cost Basis</th>
-                    <th>Current Price</th>
-                    <th>Market Value</th>
-                    <th>Unrealized P&L</th>
+                    <th 
+                      onClick={() => handleSort('ticker')} 
+                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                      title="Click to sort by ticker"
+                    >
+                      Ticker{getSortIcon('ticker')}
+                    </th>
+                    <th 
+                      onClick={() => handleSort('quantity')} 
+                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                      title="Click to sort by quantity"
+                    >
+                      Quantity{getSortIcon('quantity')}
+                    </th>
+                    <Tooltip title="Cost basis is calculated using the weighted average of all purchases for this holding." placement="top">
+                      <th 
+                        onClick={() => handleSort('cost_basis')} 
+                        style={{ cursor: 'pointer', userSelect: 'none' }}
+                        title="Click to sort by cost basis"
+                      >
+                        Cost Basis{getSortIcon('cost_basis')}
+                      </th>
+                    </Tooltip>
+                    <Tooltip title="Current price is the latest market price for this holding." placement="top">
+                      <th 
+                        onClick={() => handleSort('current_price')} 
+                        style={{ cursor: 'pointer', userSelect: 'none' }}
+                        title="Click to sort by current price"
+                      >
+                        Current Price{getSortIcon('current_price')}
+                      </th>
+                    </Tooltip>
+                    <Tooltip title="Market value is the current market price multiplied by the quantity held." placement="top">
+                      <th 
+                        onClick={() => handleSort('market_value')} 
+                        style={{ cursor: 'pointer', userSelect: 'none' }}
+                        title="Click to sort by market value"
+                      >
+                        Market Value{getSortIcon('market_value')}
+                      </th>
+                    </Tooltip>
+                    <Tooltip title="Unrealized P&L is the profit or loss if you were to sell this holding at the current market price." placement="top">
+                      <th 
+                        onClick={() => handleSort('unrealized_pnl')} 
+                        style={{ cursor: 'pointer', userSelect: 'none' }}
+                        title="Click to sort by unrealized P&L"
+                      >
+                        Unrealized P&L{getSortIcon('unrealized_pnl')}
+                      </th>
+                    </Tooltip>
                   </tr>
                 </thead>
                 <tbody>
-                  {portfolio.holdings.map((holding, index) => (
+                  {sortedHoldings.map((holding, index) => (
                     <tr
                       key={index}
                       className={
@@ -504,13 +629,6 @@ function Home() {
               </table>
             )}
           </div>
-        </div>
-
-        {/* Setup Button */}
-        <div className="setup-section">
-          <button onClick={setupPortfolio} className="setup-button">
-            Reset & Setup Default Portfolio
-          </button>
         </div>
       </div>
 

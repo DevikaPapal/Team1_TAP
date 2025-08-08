@@ -30,6 +30,12 @@ function Trades() {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [pendingTrade, setPendingTrade] = useState(null);
 
+  // Transaction sorting state
+  const [transactionSortConfig, setTransactionSortConfig] = useState({ 
+    key: 'transaction_date', 
+    direction: 'desc' // Default to newest first
+  });
+
   useEffect(() => {
     fetchPortfolio();
   }, []);
@@ -343,6 +349,43 @@ function Trades() {
     setPendingTrade(null);
   };
 
+  // Transaction sorting functions
+  const handleTransactionSort = (key) => {
+    if (key === 'transaction_date') {
+      // Toggle between asc (oldest first, up arrow) and desc (newest first, down arrow)
+      const newDirection = transactionSortConfig.direction === 'asc' ? 'desc' : 'asc';
+      setTransactionSortConfig({ key: 'transaction_date', direction: newDirection });
+    }
+  };
+
+  const getSortedTransactions = () => {
+    if (!transactions || transactions.length === 0) return [];
+    
+    const sortableTransactions = [...transactions];
+    // Always sort by transaction_date since that's the only sortable column
+    sortableTransactions.sort((a, b) => {
+      const aValue = new Date(a.transaction_date);
+      const bValue = new Date(b.transaction_date);
+      
+      if (aValue < bValue) {
+        return transactionSortConfig.direction === 'asc' ? -1 : 1;
+      }
+      if (aValue > bValue) {
+        return transactionSortConfig.direction === 'asc' ? 1 : -1;
+      }
+      return 0;
+    });
+    
+    return sortableTransactions;
+  };
+
+  const getTransactionSortIcon = (columnKey) => {
+    if (columnKey === 'transaction_date') {
+      return transactionSortConfig.direction === 'asc' ? ' ↑' : ' ↓';
+    }
+    return '';
+  };
+
   // Helper function to format market cap
   const formatMarketCap = (marketCap) => {
     if (marketCap >= 1000000000) {
@@ -428,7 +471,7 @@ function Trades() {
   if (loading) {
     return (
       <div className="loading-container">
-        <h2>Loading Portfolio...</h2>
+        <h2>Loading Trading Dashboard...</h2>
       </div>
     );
   }
@@ -436,7 +479,7 @@ function Trades() {
   if (error) {
     return (
       <div className="error-container">
-        <h2>Error Loading Portfolio</h2>
+        <h2>Error Loading Trading Dashboard</h2>
         <p>{error}</p>
         <button onClick={fetchPortfolio}>Retry</button>
       </div>
@@ -500,7 +543,7 @@ function Trades() {
 
           
           <div className="stocks-sections-container">
-            {previousStocks.length == 0 && (              
+            {previousStocks.length === 0 && (              
             <div className="popular-stocks">
               <p className="popular-stocks-label">Popular stocks:</p>
               <div className="popular-stock-buttons">
@@ -551,10 +594,10 @@ function Trades() {
               
               <div className="quote-price-section">
                 <p className="quote-main-price">
-                  <strong>${searchResult.price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong>
+                  <strong>${searchResult.price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 4})}</strong>
                 </p>
                 <p className={searchResult.change >= 0 ? "positive-change" : "negative-change"}>
-                  ${searchResult.change.toFixed(2)} ({searchResult.percent_change.toFixed(2)}%)
+                  ${searchResult.change.toFixed(4)} ({searchResult.percent_change.toFixed(2)}%)
                 </p>
               </div>
 
@@ -620,10 +663,10 @@ function Trades() {
               
               <div className="quote-price-section">
                 <p className="quote-main-price">
-                  <strong>${tradeQuote.price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong>
+                  <strong>${tradeQuote.price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 4})}</strong>
                 </p>
                 <p className={tradeQuote.change >= 0 ? "positive-change" : "negative-change"}>
-                  ${tradeQuote.change.toFixed(2)} ({tradeQuote.percent_change.toFixed(2)}%)
+                  ${tradeQuote.change.toFixed(4)} ({tradeQuote.percent_change.toFixed(2)}%)
                 </p>
               </div>
 
@@ -696,16 +739,33 @@ function Trades() {
               <table className="holdings-table">
                 <thead className="table-header">
                   <tr>
-                    <th className="table-header-cell table-header-cell-left">Date</th>
-                    <th className="table-header-cell table-header-cell-left">Ticker</th>
-                    <th className="table-header-cell table-header-cell-left">Type</th>
-                    <th className="table-header-cell table-header-cell-left">Quantity</th>
-                    <th className="table-header-cell table-header-cell-left">Price</th>
-                    <th className="table-header-cell table-header-cell-left">Total</th>
+                    <th 
+                      className="table-header-cell table-header-cell-left"
+                      onClick={() => handleTransactionSort('transaction_date')}
+                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                      title="Click to sort by date"
+                    >
+                      Date{getTransactionSortIcon('transaction_date')}
+                    </th>
+                    <th className="table-header-cell table-header-cell-left">
+                      Ticker
+                    </th>
+                    <th className="table-header-cell table-header-cell-left">
+                      Type
+                    </th>
+                    <th className="table-header-cell table-header-cell-left">
+                      Quantity
+                    </th>
+                    <th className="table-header-cell table-header-cell-left">
+                      Price
+                    </th>
+                    <th className="table-header-cell table-header-cell-left">
+                      Total
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {transactions.map((transaction, index) => (
+                  {getSortedTransactions().map((transaction, index) => (
                     <tr key={transaction.id} className={index % 2 === 0 ? "table-row-even" : "table-row-odd"}>
                       <td className="table-cell table-cell-left">
                         {(() => {

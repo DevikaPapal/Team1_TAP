@@ -102,10 +102,10 @@ def register_routes(app):
                 "message": "Buy transaction successful",
                 "ticker": ticker,
                 "quantity": str(quantity),
-                "price": str(round(price,2)),
-                "execution_price": str(round(price,2)),
+                "price": str(round(price, 4)),
+                "execution_price": str(round(price, 4)),  # Make it clear this is the execution price
                 "total_cost": str(round(quantity * price, 2)),
-                "new_cash_balance": str(round(portfolio.cash_balance, 2))
+                "new_cash_balance": str(round(portfolio.cash_balance, 4))
             }), 200
         
         except Exception as e:
@@ -118,7 +118,8 @@ def register_routes(app):
         if not holding:
             return jsonify({"error": f"You do not own any shares of {ticker}"}), 400
         if quantity > holding.quantity:
-            return jsonify({"error": f"Sell quantity ({quantity}) exceeds holdings ({holding.quantity})"}), 400  
+            return jsonify({"error": f"Sell quantity ({quantity}) exceeds holding quantity ({int(holding.quantity)})"}), 400
+
         try:
             total_sale_value = quantity * price
             portfolio.cash_balance += total_sale_value
@@ -151,8 +152,8 @@ def register_routes(app):
                 "message": "Sell transaction successful",
                 "ticker": ticker,
                 "quantity": str(quantity),
-                "price": str(round(price, 2)),
-                "execution_price": str(round(price, 2)),# Make it clear this is the execution price
+                "price": str(round(price, 4)),
+                "execution_price": str(round(price, 4)),  # Make it clear this is the execution price
                 "total_proceeds": str(round(quantity * price, 2)),
                 "realized_pnl": str(round(realized_pnl, 2)),
                 "new_cash_balance": str(round(portfolio.cash_balance, 2))
@@ -412,18 +413,18 @@ def register_routes(app):
             data = {
                 "name": info.get('longName', info.get('shortName', 'N/A')),
                 "ticker": ticker,
-                "price": round(regular_market_price, 2),
-                "change": round(regular_market_price - previous_close, 2),
+                "price": round(regular_market_price, 4),
+                "change": round(regular_market_price - previous_close, 4),
                 "percent_change": percent_change,
-                "day_high": round(info.get('regularMarketDayHigh', 0), 2),
-                "day_low": round(info.get('regularMarketDayLow', 0), 2),
+                "day_high": round(info.get('regularMarketDayHigh', 0), 4),
+                "day_low": round(info.get('regularMarketDayLow', 0), 4),
                 "market_cap": info.get('marketCap', 0),
                 "week_52_high": round(info.get('fiftyTwoWeekHigh', 0), 2),
                 "week_52_low": round(info.get('fiftyTwoWeekLow', 0), 2),
                 "volume": info.get('regularMarketVolume', 0),
                 "pe_ratio": round(info.get('trailingPE', 0), 2) if info.get('trailingPE') else None,
                 "dividend_yield": info.get('dividendYield') if info.get('dividendYield') else None,
-                "beta": round(info.get('beta', 0), 2) if info.get('beta') else None,
+                "beta": round(info.get('beta', 0), 4) if info.get('beta') else None,
                 "sector": info.get('sector', 'N/A'),
                 "industry": info.get('industry', 'N/A')
             }
@@ -651,29 +652,26 @@ def register_routes(app):
             holding4 = Holding(portfolio_id=portfolio.id, ticker='AMZN', quantity=Decimal('38'), cost_basis=Decimal('200.00'))
             holding5 = Holding(portfolio_id=portfolio.id, ticker='VOO', quantity=Decimal('6'), cost_basis=Decimal('305.00'))
             holding6 = Holding(portfolio_id=portfolio.id, ticker='MSFT', quantity=Decimal('29'), cost_basis=Decimal('520.00'))
-            handle_buy(portfolio, 'AAPL', Decimal('10'), Decimal('150.00')) 
-            handle_buy(portfolio, 'GOOGL', Decimal('8'), Decimal('180.00'))  
-            handle_buy(portfolio, 'NFLX', Decimal('5'), Decimal('1200.00'))
-            handle_buy(portfolio, 'AMZN', Decimal('38'), Decimal('200.00'))
-            handle_buy(portfolio, 'VOO', Decimal('6'), Decimal('305.00'))
-            handle_buy(portfolio, 'MSFT', Decimal('29'), Decimal('520.00'))
-            # transaction = Transaction(portfolio_id=portfolio.id, ticker='AAPL', transaction_type='buy', price=Decimal('150.00'), quantity=Decimal('10'), transaction_date=datetime.now()- timedelta(days=1, hours=2))
-            # transaction2 = Transaction(portfolio_id=portfolio.id, ticker='NFLX', transaction_type='buy', price=Decimal('900.00'), quantity=Decimal('5'), transaction_date=datetime.now()- timedelta(days=4, hours=2))
-            # transaction3 = Transaction(portfolio_id=portfolio.id, ticker='MSFT', transaction_type='buy', price=Decimal('520.00'), quantity=Decimal('29'), transaction_date=datetime.now()- timedelta(days=6, hours=2))
-            # transaction4 = Transaction(portfolio_id=portfolio.id, ticker='AMZN', transaction_type='buy', price=Decimal('200.00'), quantity=Decimal('38'), transaction_date=datetime.now()- timedelta(days=9, hours=2))
-            # transaction5 = Transaction(portfolio_id=portfolio.id, ticker='VOO', transaction_type='buy', price=Decimal('305.00'), quantity=Decimal('6'), transaction_date=datetime.now()- timedelta(days=24, hours=2))
-            # transaction6 = Transaction(portfolio_id=portfolio.id, ticker='GOOGL', transaction_type='buy', price=Decimal('180.00'), quantity=Decimal('8'), transaction_date=datetime.now()- timedelta(days=37, hours=2))
-            # db.session.add(holding)
-            # db.session.add(holding2)
-            # db.session.add(holding3)
-            # db.session.add(holding4)
-            # db.session.add(holding5)
-            # db.session.add(holding6)
-            # db.session.add(transaction)
-            # db.session.add(transaction2)
-            # db.session.add(transaction3)
-            # db.session.add(transaction4)
-            # db.session.add(transaction5)
-            # db.session.add(transaction6)
+            transaction = Transaction(portfolio_id=portfolio.id, ticker='AAPL', transaction_type='buy', price=Decimal('150.00'), quantity=Decimal('10'), transaction_date=datetime.now()- timedelta(days=1, hours=2))
+            transaction2 = Transaction(portfolio_id=portfolio.id, ticker='NFLX', transaction_type='buy', price=Decimal('900.00'), quantity=Decimal('5'), transaction_date=datetime.now()- timedelta(days=4, hours=2))
+            transaction3 = Transaction(portfolio_id=portfolio.id, ticker='MSFT', transaction_type='buy', price=Decimal('520.00'), quantity=Decimal('29'), transaction_date=datetime.now()- timedelta(days=6, hours=2))
+            transaction4 = Transaction(portfolio_id=portfolio.id, ticker='AMZN', transaction_type='buy', price=Decimal('200.00'), quantity=Decimal('38'), transaction_date=datetime.now()- timedelta(days=9, hours=2))
+            transaction5 = Transaction(portfolio_id=portfolio.id, ticker='VOO', transaction_type='buy', price=Decimal('305.00'), quantity=Decimal('6'), transaction_date=datetime.now()- timedelta(days=24, hours=2))
+            transaction6 = Transaction(portfolio_id=portfolio.id, ticker='GOOGL', transaction_type='buy', price=Decimal('180.00'), quantity=Decimal('8'), transaction_date=datetime.now()- timedelta(days=37, hours=2))
+            portfolio.cash_balance -= (transaction.price * transaction.quantity) + (transaction2.price * transaction2.quantity) + \
+                                       (transaction3.price * transaction3.quantity) + (transaction4.price * transaction4.quantity) + \
+                                       (transaction5.price * transaction5.quantity) + (transaction6.price * transaction6.quantity)
+            db.session.add(holding)
+            db.session.add(holding2)
+            db.session.add(holding3)
+            db.session.add(holding4)
+            db.session.add(holding5)
+            db.session.add(holding6)
+            db.session.add(transaction)
+            db.session.add(transaction2)
+            db.session.add(transaction3)
+            db.session.add(transaction4)
+            db.session.add(transaction5)
+            db.session.add(transaction6)
             db.session.commit()
             return jsonify({"message": "Database reset and default portfolio created.", "portfolio_id": portfolio.id}), 201
